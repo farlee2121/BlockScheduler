@@ -1,11 +1,13 @@
 ﻿namespace Block.Core
-
 module HostsFileWebBlockAccessor =
+    open Contracts
 
+    type FileLocator = Stream of System.IO.Stream | Path of string | Uri of System.Uri 
 
-    type public BlockedWebAddress = { Url:string; }
-    val blockDomain : (BlockedWebAddress seq) -> (string) -> (BlockedWebAddress seq)
+    val blockSite : FileLocator -> BlockedSite -> unit
 
-    val unblockDomain : (BlockedWebAddress seq) -> string -> (BlockedWebAddress seq)
+    val unblockSite : FileLocator -> BlockedSite -> unit
+
+    val listBlockedSites : FileLocator -> unit -> BlockedSite seq
 
     //val getBlockedDomains : unit 

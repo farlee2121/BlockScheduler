@@ -5,6 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="BlockAccessorContracts.fs" />
     <Compile Include="HostsFileWebBlockAccessor.fsi" />
     <Compile Include="HostsFileWebBlockAccessor.fs" />
   </ItemGroup>

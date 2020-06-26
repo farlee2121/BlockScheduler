@@ -10,6 +10,6 @@ open Block.Core.HostsFileWebBlockAccessor
 [<EntryPoint>]
 let main argv =
     printfn "Hello World from F#!"
-    unblockDomain
+    //unblockDomain
     //HostsFileWebBlockAccessor.
     0 // return an integer exit code
