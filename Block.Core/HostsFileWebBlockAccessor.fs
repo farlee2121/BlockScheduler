@@ -13,17 +13,22 @@ module HostsFileWebBlockAccessor =
     let contains substr (record:string) = record.Contains(substr)
 
     let sectionStartMarker = "#blocker.start"
-    let sectionEndMarker = "#blocker.start"
+    let sectionEndMarker = "#blocker.end"
 
     let isSectionStart = contains sectionStartMarker
     let isSectionEnd = contains sectionEndMarker
-
+    
+    type RecordParseResult = Result<BlockedSite, string>
+    module Result = 
+        let isOk = function | Ok -> true | Error -> false
+        let tryGet = function | Ok res -> res | Error -> failwith "Could not get value. Result was an error"
 
     let parseUrlFromRecord (hostLine: string) = 
-        let urlRegex = new Regex("(http:|https:)([^\s]+)");
+    // what I really want here is does it look like "something.something"
+        let urlRegex = new Regex("(\s)+([^\s]+)");
         let urlMatch = urlRegex.Match(hostLine)
-        if(urlMatch.Success) then urlMatch.Value
-        else failwith "Invalid hosts record: no domain/url present"
+        if(urlMatch.Success) then RecordParseResult.Ok {Url = urlMatch.Value.Trim()}
+        else RecordParseResult.Error "Invalid hosts record: no domain/url present"
 
     let getHostsBlockerSection hostLines = 
         // take while after #start and before # end 
@@ -31,8 +36,15 @@ module HostsFileWebBlockAccessor =
         let recordsBeforeBlockerSection = hostLines |> Seq.takeWhile ((not) << isSectionStart) |> Set.ofSeq
         let recordsBeforeSectionEnd = hostLines |> Seq.takeWhile ((not) << isSectionEnd) |> Set.ofSeq
 
-        Set.difference recordsBeforeSectionEnd recordsBeforeBlockerSection
-        |> Seq.map (fun stringRecord -> {Url = (parseUrlFromRecord stringRecord)})
+        let blockerSection =
+            (Set.union recordsBeforeBlockerSection (Set.ofArray [|sectionStartMarker; sectionEndMarker|]))
+            |> Set.difference recordsBeforeSectionEnd 
+        let parsedSites =
+            blockerSection
+            |> Seq.map parseUrlFromRecord
+            |> Seq.filter Result.isOk
+            |> Seq.map Result.tryGet
+        parsedSites
 
 
 
@@ -40,27 +52,43 @@ module HostsFileWebBlockAccessor =
         sprintf "127.0.0.1 %s" blockRecord.Url
 
 
-    let rec private ReadAllLines (streamReader:StreamReader) = 
-        match streamReader.ReadLine() with
-        | null -> []
-        | value -> value :: ReadAllLines streamReader
+    module Stream = 
+        let Rewind (stream:Stream) = stream.Position <- int64 0; stream
 
-    let rec WriteAllLines (stream:Stream) (lines:seq<string>) =
-        // conctrasting the interative approach to the recursive read approach
-        let writer = (new StreamWriter(stream))
-        lines |> Seq.iter (fun line -> writer.WriteLine(line))
-        writer.Flush();
-        
-    let private GetLinesFromStream (stream:Stream) = 
-        ReadAllLines (new StreamReader(stream))
+        let rec private ReadAllLinesRec (streamReader:StreamReader) = 
+            match streamReader.ReadLine() with
+            | null -> []
+            | value -> value :: ReadAllLinesRec streamReader
+
+
+        let rec WriteAllLines (stream:Stream) (lines:seq<string>) =
+            // conctrasting the interative approach to the recursive read approach
+            let writer = (new StreamWriter(Rewind stream))
+            lines |> Seq.iter (fun line -> writer.WriteLine(line))
+            writer.Flush();
+
+        let ReadAllLines (stream:Stream) = ReadAllLinesRec (new StreamReader(Rewind stream))
+
+    let EnsureSectionStart (lines: seq<string>) = 
+        match Seq.tryLast lines with 
+        | Some v when v = sectionStartMarker -> lines
+        | _ -> (Seq.append [sectionStartMarker] lines)
+
+    let private EnsureSectionEnd (lines: seq<string>) = 
+        match Seq.tryHead lines with 
+        |  Some v when v = sectionEndMarker -> lines
+        | _ -> (Seq.append lines [sectionEndMarker]) 
 
     let saveHostFileLines hostFileStream (hostRecords: BlockedSite seq) =
-        let rawLines = GetLinesFromStream hostFileStream 
-        let recordsBeforeBlockerSection = rawLines |> Seq.takeWhile ((not) << isSectionStart)
-        let recordsAfterSectionEnd = rawLines |> Seq.rev |>  Seq.takeWhile ((not) << isSectionEnd)
-        let blockerSection = hostRecords |> Seq.map blockRecordToHostLine
-        let allLines = [|recordsBeforeBlockerSection; blockerSection; recordsAfterSectionEnd|] |> Seq.reduce Seq.append
-        WriteAllLines hostFileStream allLines
+        let rawLines = Stream.ReadAllLines hostFileStream 
+        let recordsBeforeBlockerSection = rawLines |> Seq.takeWhile ((not) << isSectionStart) |> EnsureSectionStart
+        let recordsAfterSectionEnd = rawLines |> Seq.rev |>  Seq.takeWhile ((not) << isSectionEnd) |> EnsureSectionEnd
+        let blockerSection = 
+            hostRecords 
+            |> Seq.filter (fun url -> (not <| System.String.IsNullOrWhiteSpace(url.Url))) // is there a good way to generalize this to valid host record?
+            |> Seq.map blockRecordToHostLine
+        let allLines = [|recordsBeforeBlockerSection ; blockerSection; recordsAfterSectionEnd|] |> Seq.reduce Seq.append
+        Stream.WriteAllLines hostFileStream allLines
 
 
     let matchSite (domain:BlockedSite) (record:BlockedSite) = contains domain.Url record.Url
@@ -97,7 +125,7 @@ module HostsFileWebBlockAccessor =
 
     let blockSite (hostFilePath:FileLocator) (site:BlockedSite) =
         resolveFile hostFilePath
-        |> GetLinesFromStream
+        |> Stream.ReadAllLines
         |> getHostsBlockerSection
         |> addSiteBlock' site
         |> saveHostFileLines (resolveFile hostFilePath)
@@ -106,14 +134,14 @@ module HostsFileWebBlockAccessor =
 
     let unblockSite (hostFilePath:FileLocator) (site:BlockedSite) =
         resolveFile hostFilePath
-        |> GetLinesFromStream
+        |> Stream.ReadAllLines
         |> getHostsBlockerSection
         |> removeSiteBlock' site
         |> saveHostFileLines (resolveFile hostFilePath)
 
     let listBlockedSites (hostFilePath:FileLocator) () =
         resolveFile hostFilePath
-        |> GetLinesFromStream
+        |> Stream.ReadAllLines
         |> getHostsBlockerSection
 
     

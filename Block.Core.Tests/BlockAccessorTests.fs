@@ -6,10 +6,14 @@ module BlockAccessorTests
     open Block.Core
 
     module TestApi = 
-        let private stream = HostsFileWebBlockAccessor.Stream (new System.IO.MemoryStream())
-        let BlockSite = HostsFileWebBlockAccessor.blockSite stream
-        let UnblockSite = HostsFileWebBlockAccessor.unblockSite stream
-        let ListBlockedSites =  HostsFileWebBlockAccessor.listBlockedSites stream
+        let private stream = new System.IO.MemoryStream()
+        let private fileLocator = HostsFileWebBlockAccessor.Stream stream
+        let BlockSite = HostsFileWebBlockAccessor.blockSite fileLocator
+        let UnblockSite = HostsFileWebBlockAccessor.unblockSite fileLocator
+        let ListBlockedSites =  HostsFileWebBlockAccessor.listBlockedSites fileLocator
+        let GetRawHostFile () = 
+            stream.Position <- int64 0 
+            (new System.IO.StreamReader(stream)).ReadToEnd()
 
     // expecto mentions https://github.com/SwensenSoftware/unquote, but I don't quite understand the value prop yet
     [<Tests>]
@@ -23,7 +27,7 @@ module BlockAccessorTests
                 let site = { Url = "" }
                 TestApi.BlockSite site
                 let blockedSites = TestApi.ListBlockedSites ()   
-                Expect.equal (seq { site }) blockedSites "Site not blocked??"
+                Expect.sequenceEqual (Seq.empty) blockedSites "Site not blocked??"
             }
             test "Unblock When Not Blocked" {
                 raise (NotImplementedException())
@@ -38,7 +42,16 @@ module BlockAccessorTests
                 let site = { Url = "www.meow.com" }
                 TestApi.BlockSite site
                 let blockedSites = TestApi.ListBlockedSites ()
-                Expect.equal blockedSites (seq { site }) "Site not blocked??"
+                Expect.sequenceEqual blockedSites (seq { site }) "Site not blocked??"
+            }
+            test "Sequential Blocks" {
+                let site1 = { Url = "www.meow.com" }
+                TestApi.BlockSite site1
+                let site2 = { Url = "www.pat.com" }
+                TestApi.BlockSite site2
+                let blockedSites = TestApi.ListBlockedSites ()
+
+                Expect.sequenceEqual blockedSites (seq { site1; site2 }) "Site not blocked??"
             }
             test "Block Multiple" {
                 raise (NotImplementedException())
