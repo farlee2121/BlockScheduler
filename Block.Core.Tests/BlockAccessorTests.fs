@@ -21,25 +21,36 @@ module BlockAccessorTests
     let ``My test`` =
         testList "Block accessor" [
             test "List Blocked Sites When None Blocked" {
-                let hostFile = TestApi.MockHostFile ();
+                let hostFile = TestApi.MockHostFile ()
                 let blockedSites = TestApi.ListBlockedSites hostFile ()    
                 Expect.isEmpty blockedSites "Blocked sites should be empty"
             }
             test "Block empty" {
-                let hostFile = TestApi.MockHostFile ();
+                let hostFile = TestApi.MockHostFile ()
                 let site = { Url = "" }
                 TestApi.BlockSite hostFile site
                 let blockedSites = TestApi.ListBlockedSites hostFile ()   
                 Expect.sequenceEqual (Seq.empty) blockedSites "Site not blocked??"
             }
             test "Unblock When Not Blocked" {
-                raise (NotImplementedException())
+                let hostFile = TestApi.MockHostFile ()
+                let site = { Url = "www.iamsite.com"}
+                TestApi.UnblockSite hostFile site
+                Expect.isEmpty (TestApi.ListBlockedSites hostFile ()) "Expected empty"
             }
             test "Unblock Single" {
-                raise (NotImplementedException())
+                let hostFile = TestApi.MockHostFile ()
+                let site = { Url = "www.iamsite.com"}
+                TestApi.BlockSite hostFile site
+                TestApi.UnblockSite hostFile site
+                Expect.isEmpty (TestApi.ListBlockedSites hostFile ()) "Expected empty"
             }
-            test "Unblock Doesn't remove other blocks" {
-                raise (NotImplementedException())
+            test "Unblock doesn't remove other blocks" {
+                let hostFile = TestApi.MockHostFile ()
+                let sitesToBlock = [{ Url = "www.iamsite.com"}; { Url = "www.nya.com"}; { Url = "george.com"}]
+                sitesToBlock |> List.iter (TestApi.BlockSite hostFile)
+                TestApi.UnblockSite hostFile (List.head sitesToBlock)
+                Expect.sequenceEqual (Seq.sort (TestApi.ListBlockedSites hostFile ())) (Seq.sort (List.tail sitesToBlock)) ""
             }
             test "Block Single" {
                 let hostFile = TestApi.MockHostFile ();
@@ -48,7 +59,16 @@ module BlockAccessorTests
                 let blockedSites = TestApi.ListBlockedSites hostFile ()
                 Expect.sequenceEqual blockedSites (seq { site }) "Site not blocked??"
             }
-            test "Sequential Blocks" {
+            test "Re-block same site" {
+                let hostFile = TestApi.MockHostFile ();
+                let site1 = { Url = "www.meow.com" }
+                TestApi.BlockSite hostFile site1
+                TestApi.BlockSite hostFile site1
+                let blockedSites = TestApi.ListBlockedSites hostFile ()
+
+                Expect.sequenceEqual blockedSites (seq { site1; }) "Site not blocked??"
+            }
+            test "Block Multiple" {
                 let hostFile = TestApi.MockHostFile ();
                 let site1 = { Url = "www.meow.com" }
                 TestApi.BlockSite hostFile site1
@@ -57,9 +77,6 @@ module BlockAccessorTests
                 let blockedSites = TestApi.ListBlockedSites hostFile ()
 
                 Expect.sequenceEqual blockedSites (seq { site1; site2 }) "Site not blocked??"
-            }
-            test "Block Multiple" {
-                raise (NotImplementedException())
             }
         ]
 
