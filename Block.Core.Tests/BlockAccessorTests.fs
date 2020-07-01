@@ -98,7 +98,6 @@ module BlockAccessorTests
 
             let originalLines = ["This is a line";"another line"]
             let originalContent = String.joinLines originalLines
-            //let expectedLines = Seq.append originalLines ["#"]
             let hostFile = TestApi.HostFileFromLines originalLines
 
             let site = { Url = "www.meow.com" }
@@ -109,9 +108,3 @@ module BlockAccessorTests
         }
     ]
         
-        
-
-
-    
-
-// how do I achieve test suite re-use like I do in c#? do I still make a test api?

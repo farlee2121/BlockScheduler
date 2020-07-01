@@ -7,10 +7,6 @@ open StreamExtensions
 open SeqExtensions
 
 module HostsFileWebBlockAccessor =
-// model of host file is a bunch of lines split on spaces
-// starting with # means commented out
-// ip part, domain part, is commented, other content (i.e. comments)
-// could certainly build a model of whole file, but it would be simplier if I reserve a portion of the file #blocker.start #blocker.end
 
     let contains substr (record:string) = record.Contains(substr)
 
@@ -26,18 +22,13 @@ module HostsFileWebBlockAccessor =
         let isOk = function | Ok -> true | Error -> false
         let tryGet = function | Ok res -> res | Error -> failwith "Could not get value. Result was an error"
 
-
-
     let parseUrlFromRecord (hostLine: string) = 
-    // what I really want here is does it look like "something.something"
         let urlRegex = new Regex("(\s)+([^\s]+)");
         let urlMatch = urlRegex.Match(hostLine)
         if(urlMatch.Success) then RecordParseResult.Ok {Url = urlMatch.Value.Trim()}
         else RecordParseResult.Error "Invalid hosts record: no domain/url present"
 
     let getHostsBlockerSection hostLines = 
-        // take while after #start and before # end 
-        // could do this with state, could do this with set difference. We'll do set diff for now
         let recordsBeforeBlockerSection = hostLines |> Seq.takeWhile ((not) << isSectionStart) |> Set.ofSeq
         let recordsBeforeSectionEnd = hostLines |> Seq.takeWhile ((not) << isSectionEnd) |> Set.ofSeq
 
@@ -78,11 +69,6 @@ module HostsFileWebBlockAccessor =
     let matchSite (domain:BlockedSite) (record:BlockedSite) = contains domain.Url record.Url
 
 
-
-    // only these two should really be public
-    // hmm, it is most convenient to write these against a collection of blocked addresses, but I need it to save to the file
-    // I should compose, but what do I do with the names? What do I want to be my config parameters that configure? Just the file? A host record source
-    // I will likely only use this method of block/unblock with the host file, so I would say I want to just partially apply the file path
     let addSiteBlock (hostRecords:BlockedSite seq) (domain:BlockedSite) =
         let doesRecordExist = hostRecords |> Seq.tryFind (matchSite domain)
         match doesRecordExist with
