@@ -7,13 +7,21 @@ module BlockAccessorTests
 
     module TestApi = 
         // alternately, I could create a class that internally manages the partial application of the host file, but that isn't very functional
-        let MockHostFile () = HostsFileWebBlockAccessor.Stream (new System.IO.MemoryStream())
+        let MockHostFile () = Contracts.Stream (new System.IO.MemoryStream())
+        let HostFileFromLines (lines:seq<string>) =
+            let stream = (new System.IO.MemoryStream())
+            StreamExtensions.Stream.WriteAllLines stream lines
+            |> Contracts.Stream 
+        let HostFileFromString (contents:string) = 
+            let stream = (new System.IO.MemoryStream())
+            StreamExtensions.Stream.WriteAllText stream contents
+            |> Contracts.Stream 
         let BlockSite = HostsFileWebBlockAccessor.blockSite 
         let UnblockSite = HostsFileWebBlockAccessor.unblockSite 
         let ListBlockedSites =  HostsFileWebBlockAccessor.listBlockedSites 
         let GetRawHostFile fileLocator = 
             match fileLocator with 
-            | HostsFileWebBlockAccessor.Stream s -> (s.Position <- int64 0; (new System.IO.StreamReader(s)).ReadToEnd())
+            | Contracts.Stream s -> (s.Position <- int64 0; (new System.IO.StreamReader(s)).ReadToEnd())
             | _ -> raise (NotImplementedException())
 
     // expecto mentions https://github.com/SwensenSoftware/unquote, but I don't quite understand the value prop yet
@@ -79,11 +87,25 @@ module BlockAccessorTests
                 Expect.sequenceEqual blockedSites (seq { site1; site2 }) "Site not blocked??"
             }
         ]
+    
+    module String =
+        let join (separator:string) (strings:seq<string>)= System.String.Join(separator, strings)
+        let joinLines = join "\r\n";
 
     [<Tests>]
     let HostFileSpecific = testList "Hostfile-Specific tests" [
         test "Doesn't delete records from other sources" {
-            raise (NotImplementedException())
+
+            let originalLines = ["This is a line";"another line"]
+            let originalContent = String.joinLines originalLines
+            //let expectedLines = Seq.append originalLines ["#"]
+            let hostFile = TestApi.HostFileFromLines originalLines
+
+            let site = { Url = "www.meow.com" }
+            TestApi.BlockSite hostFile site
+            let modifiedContent = TestApi.GetRawHostFile hostFile
+
+            Expect.isTrue (modifiedContent.StartsWith(originalContent, System.StringComparison.Ordinal)) "Doesn't start with original content"
         }
     ]
         

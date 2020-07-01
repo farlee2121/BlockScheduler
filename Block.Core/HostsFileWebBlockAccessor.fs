@@ -3,6 +3,8 @@
 open System.Text.RegularExpressions
 open Contracts
 open System.IO
+open StreamExtensions
+open SeqExtensions
 
 module HostsFileWebBlockAccessor =
 // model of host file is a bunch of lines split on spaces
@@ -19,9 +21,12 @@ module HostsFileWebBlockAccessor =
     let isSectionEnd = contains sectionEndMarker
     
     type RecordParseResult = Result<BlockedSite, string>
+
     module Result = 
         let isOk = function | Ok -> true | Error -> false
         let tryGet = function | Ok res -> res | Error -> failwith "Could not get value. Result was an error"
+
+
 
     let parseUrlFromRecord (hostLine: string) = 
     // what I really want here is does it look like "something.something"
@@ -52,43 +57,22 @@ module HostsFileWebBlockAccessor =
         sprintf "127.0.0.1 %s" blockRecord.Url
 
 
-    module Stream = 
-        let Rewind (stream:Stream) = stream.Position <- int64 0; stream
-
-        let rec private ReadAllLinesRec (streamReader:StreamReader) = 
-            match streamReader.ReadLine() with
-            | null -> []
-            | value -> value :: ReadAllLinesRec streamReader
-
-
-        let rec WriteAllLines (stream:Stream) (lines:seq<string>) =
-            // conctrasting the interative approach to the recursive read approach
-            let writer = (new StreamWriter(Rewind stream))
-            lines |> Seq.iter (fun line -> writer.WriteLine(line))
-            writer.Flush();
-
-        let ReadAllLines (stream:Stream) = ReadAllLinesRec (new StreamReader(Rewind stream))
-
-    let EnsureSectionStart (lines: seq<string>) = 
-        match Seq.tryLast lines with 
-        | Some v when v = sectionStartMarker -> lines
-        | _ -> (Seq.append [sectionStartMarker] lines)
-
-    let private EnsureSectionEnd (lines: seq<string>) = 
-        match Seq.tryHead lines with 
-        |  Some v when v = sectionEndMarker -> lines
-        | _ -> (Seq.append lines [sectionEndMarker]) 
+    let EnsureBlockerSection (lines: seq<string>) = 
+        let hasBlockerSection = Seq.contains sectionStartMarker lines
+        // hmm. should think about malformed sections
+        if(hasBlockerSection) then lines else Seq.append lines [sectionStartMarker; sectionEndMarker]
 
     let saveHostFileLines hostFileStream (hostRecords: BlockedSite seq) =
-        let rawLines = Stream.ReadAllLines hostFileStream 
-        let recordsBeforeBlockerSection = rawLines |> Seq.takeWhile ((not) << isSectionStart) |> EnsureSectionStart
-        let recordsAfterSectionEnd = rawLines |> Seq.rev |>  Seq.takeWhile ((not) << isSectionEnd) |> EnsureSectionEnd
+        let rawLines = Stream.ReadAllLines hostFileStream |> EnsureBlockerSection
+        let recordsBeforeBlockerSection = rawLines |> Seq.takeUntilInclusive (isSectionStart)
+        let recordsAfterSectionEnd = rawLines |> Seq.rev |>  Seq.takeUntilInclusive (isSectionEnd)
         let blockerSection = 
             hostRecords 
             |> Seq.filter (fun url -> (not <| System.String.IsNullOrWhiteSpace(url.Url))) // is there a good way to generalize this to valid host record?
             |> Seq.map blockRecordToHostLine
         let allLines = [|recordsBeforeBlockerSection ; blockerSection; recordsAfterSectionEnd|] |> Seq.reduce Seq.append
-        Stream.WriteAllLines hostFileStream allLines
+        Stream.WriteAllLines hostFileStream allLines 
+        |> ignore
 
 
     let matchSite (domain:BlockedSite) (record:BlockedSite) = contains domain.Url record.Url
@@ -114,8 +98,6 @@ module HostsFileWebBlockAccessor =
         | None -> hostRecords
 
     let removeSiteBlock' (site:BlockedSite) (hostRecords:seq<BlockedSite>) = removeSiteBlock hostRecords site
-
-    type FileLocator = Stream of Stream | Path of string | Uri of System.Uri 
 
     let resolveFile fileLocator= 
         match fileLocator with 
