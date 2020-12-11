@@ -6,6 +6,16 @@ open System.IO
 open StreamExtensions
 open SeqExtensions
 
+// how to make this more functional?
+// probably just make this a host file accessor, not specific to blocking
+// I can wrap it as a blocker later
+// create URL string wrapper using union, not record
+// decide types of lines: in parsed, out of scope?, unparsed
+// methods, get section? I think my writer should force a section, but let the caller choose the section name 
+// separate it out into a different lib
+
+(* # This can contain markdown *)
+
 module HostsFileWebBlockAccessor =
 
     let contains substr (record:string) = record.Contains(substr)
@@ -18,10 +28,7 @@ module HostsFileWebBlockAccessor =
     
     type RecordParseResult = Result<BlockedSite, string>
 
-    module Result = 
-        let isOk = function | Ok -> true | Error -> false
-        let tryGet = function | Ok res -> res | Error -> failwith "Could not get value. Result was an error"
-
+    
     let parseUrlFromRecord (hostLine: string) = 
         let urlRegex = new Regex("(\s)+([^\s]+)");
         let urlMatch = urlRegex.Match(hostLine)
@@ -37,9 +44,13 @@ module HostsFileWebBlockAccessor =
             |> Set.difference recordsBeforeSectionEnd 
         let parsedSites =
             blockerSection
-            |> Seq.map parseUrlFromRecord
-            |> Seq.filter Result.isOk
-            |> Seq.map Result.tryGet
+            |> List.ofSeq
+            |> List.map (
+               parseUrlFromRecord
+               >> (function | Ok line -> Some line | Error _ -> None )
+            )
+            |> List.filter (Option.isSome) 
+            |> List.map Option.get   
         parsedSites
 
 
@@ -110,7 +121,7 @@ module HostsFileWebBlockAccessor =
     let listBlockedSites (hostFilePath:FileLocator) () =
         resolveFile hostFilePath
         |> Stream.ReadAllLines
-        |> getHostsBlockerSection
+        |> getHostsBlockerSection |> Seq.ofList
 
     
     

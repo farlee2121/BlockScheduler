@@ -1,15 +1,18 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="SeqExtensions.fs" />
     <Compile Include="StreamExtensions.fs" />
     <Compile Include="BlockAccessorContracts.fs" />
     <Compile Include="HostsFileWebBlockAccessor.fsi" />
     <Compile Include="HostsFileWebBlockAccessor.fs" />
+    <Compile Include="HostFileAccessor.fs" />
+    <Compile Include="BlockSiteApi.fs" />
   </ItemGroup>
-
+  <ItemGroup>
+    <PackageReference Include="FSharp.Text.RegexProvider" Version="2.1.0" />
+    <PackageReference Include="Fsharpx.Extras" Version="2.5.0" />
+  </ItemGroup>
 </Project>

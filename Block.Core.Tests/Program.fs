@@ -1,4 +1,5 @@
 open Expecto
-[<EntryPoint>]
-let main argv =
-    Tests.runTestsInAssembly defaultConfig argv
+module Program =
+    [<EntryPoint>]
+    let main argv =
+        0//Tests.runTestsInAssembly defaultConfig argv
