@@ -104,5 +104,20 @@ let ``HostAccessor In-Memory Array`` =
         BuildHostAccessorTests (getRecords reader) (writeAll writer) ()
         BuildExampleBasedRegexTests ()
     ]
-            
+
+
+[<Tests>]
+let ``Section Writer Tests`` = 
+    let mutable records = [];
+    let reader () = Ok records
+    let writer lines = records <- lines
+
+    testList "Host Accessor Spec" [
+        BuildHostAccessorTests (getRecords reader) (writeAll writer) ()
+        BuildExampleBasedRegexTests ()
+    ]
+       
+// need to test the section reader/writer to make sure it doesn't mess up surroundings
+
+// next build a UI? or do I make the scheduler?
 
