@@ -18,7 +18,7 @@ open SeqExtensions
 
 module HostsFileWebBlockAccessor =
 
-    let contains substr (record:string) = record.Contains(substr)
+    let contains (substr:string) (record:string) = record.Contains(substr)
 
     let sectionStartMarker = "#blocker.start"
     let sectionEndMarker = "#blocker.end"
