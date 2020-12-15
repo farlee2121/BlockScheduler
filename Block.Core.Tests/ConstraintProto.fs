@@ -33,6 +33,8 @@ module Constraint =
     let or' left right = Or [left; right]
     let orAny list = Or list
     let matchRegex expr = Regex expr
+    let max limit = Max limit
+    let min limit = Min limit
 
     let (|IsComparable|) (obj : obj) = 
         match obj with
@@ -43,10 +45,15 @@ module Constraint =
         open FSharpx.Result
 
 
-        let validateMax max value = 
+        let validateMax value max = 
             match value with
-            | v when v < max -> Ok v
-            | _ -> Error [$"{value} is not less than {max}"]
+            | v when v <= max -> Ok v
+            | _ -> Error [$"{value} is greater than the max {max}"]
+
+        let validateMin value min = 
+            match value with
+            | v when min <= v -> Ok v
+            | _ -> Error [$"{value} is less than the min {min}"]
             //match value with
             //| :? System.IComparable as valid -> 
             //    match valid with 
@@ -64,27 +71,42 @@ module Constraint =
                 | Error errLeft, Error errRight -> Error (List.concat [errLeft; errRight])
             childResults |> List.reduce combine
 
-    //let validate value = 
-    //    let avoiding = id
+        let validateOr childResults = 
+            let combine left right =
+                match (left, right) with 
+                | Ok _, Ok _ -> left
+                | Ok ok, Error _ -> Ok ok
+                | Error err, Ok ok -> Ok ok
+                | Error errLeft, Error errRight -> Error (List.concat [errLeft; errRight])
+            childResults |> List.reduce combine
 
-    //    // I need to get my head on straight about what i'm folding here. Am I creating a function? can I fold from a result?
-    //    // Is this Constraint -> (value -> Result) or is it Constraint -> Result
-    //    // right now the fold doesn't have access to some initial value. Thus it isn't fold but reduce. I have no choice but to reduce to a function
-    //    // unless I refactor to be a true fold... right? 
+    let validate constraint' value = 
+        let avoiding a = Ok value 
 
-    //    // what I actually need is apply. If it weren't recursive I could just apply a list, but no.. I have to figure out recursive application
-    //    let appliedFold = catamorph 
-    //                        <| avoiding
-    //                        <| avoiding
-    //                        <| (>>) (DefaultValidations.validateMax)
-    //                        <| avoiding
-    //                        <| avoiding
-    //                        <| avoiding
-    //                        <| ((>>) DefaultValidations.validateAnd)
-    //                        <| ((>>) DefaultValidations.validateAnd)
-    //                        <| avoiding
-    //                        //avoiding avoiding DefaultValidations.validateMax avoiding avoiding avoiding (DefaultValidations.validateAnd) avoiding avoiding
-    //    appliedFold id
+        // I need to get my head on straight about what i'm folding here. Am I creating a function? can I fold from a result?
+        // Is this Constraint -> (value -> Result) or is it Constraint -> Result
+        // right now the fold doesn't have access to some initial value. Thus it isn't fold but reduce. I have no choice but to reduce to a function
+        // unless I refactor to be a true fold... right? 
+
+        // what I actually need is apply. If it weren't recursive I could just apply a list, but no.. I have to figure out recursive application
+        
+
+        //I want my end result to be a' -> Result<'a, string list>
+
+        //hmm, this doesn't end up with all the errors, just the first
+        // it's easier if I first evaluate every constraint to a result... I think
+        let reduceToResultForValue = catamorph 
+                                    <| avoiding
+                                    <| avoiding
+                                    <| (DefaultValidations.validateMax value)
+                                    <| DefaultValidations.validateMin value
+                                    <| avoiding
+                                    <| avoiding
+                                    <| DefaultValidations.validateAnd
+                                    <| DefaultValidations.validateOr
+                                    <| avoiding
+                                    //avoiding avoiding DefaultValidations.validateMax avoiding avoiding avoiding (DefaultValidations.validateAnd) avoiding avoiding
+        reduceToResultForValue constraint'
 
 
     // how do I match these against properties/values

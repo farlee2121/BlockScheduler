@@ -7,6 +7,7 @@ open FsUnit.Xunit
 
 open FsCheck
 open TypeGenerators
+open ConstraintProto
 
 
 //TODO: How do I achieve a test api? I think I have to do a reader monad... I can't inject into a module or namespace. I could define everything in an object, but that's yucky
@@ -120,4 +121,3 @@ let ``Section Writer Tests`` =
 // need to test the section reader/writer to make sure it doesn't mess up surroundings
 
 // next build a UI? or do I make the scheduler?
-
