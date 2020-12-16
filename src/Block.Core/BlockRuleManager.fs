@@ -1,4 +1,4 @@
-module BlockApi
+module BlockRuleManager
 open System
 
 // need schedule, domain,... pretty much it

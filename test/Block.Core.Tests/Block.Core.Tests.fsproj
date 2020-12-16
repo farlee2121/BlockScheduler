@@ -6,7 +6,6 @@
     <Compile Include="Constraint\ConstraintProto.fs" />
     <Compile Include="Constraint\ConstraintTests.fs" />
     <Compile Include="TypeGenerators.fs" />
-    <Compile Include="BlockAccessorTests.fs" />
     <Compile Include="HostAccessorTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
