@@ -34,15 +34,15 @@ type RuleId = | RuleId of Guid
 
 type BlockRule =  RuleId * Blockable * Schedule
 
-type CreateBlock = Blockable -> Schedule -> Result<RuleId, string list>
+type CreateRule = Blockable -> Schedule -> Result<RuleId, string list>
 
-type UpdateBlock = BlockRule -> Result<RuleId, string list>
+type UpdateRule = BlockRule -> Result<RuleId, string list>
 
-type PauseBlock = RuleId -> Result<RuleId, string list>
+type PauseRule = RuleId -> Result<RuleId, string list>
 
-type DeleteBlock = RuleId -> Result<RuleId, string list>
+type DeleteRule = RuleId -> Result<RuleId, string list>
 
-type GetBlockList = unit -> BlockRule list
+type GetRuleList = unit -> BlockRule list
 
 
 

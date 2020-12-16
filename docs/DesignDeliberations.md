@@ -60,3 +60,14 @@ What logic does the host accessor have that I care about reusing across differen
 - The types could be reused, but the methods would need to be pretty much completely rewritten
 
 DECISION: I'm not going to worry about abstracting the host accessor from the fact that it works on text
+
+
+## Database access
+
+Does it make sense to separate a manager and accessor?
+- I don't think it is likely a big enough domain to separate them. 
+- Hmm. I think this case is effectively a manager, but where the adapter is sufficient for data access
+- What would cause me to split off a different accessor?
+  - association of the data to different entitites in different contexts
+  - non-trivial logic around access or managing owned types
+  - 

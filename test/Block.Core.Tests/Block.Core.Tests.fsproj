@@ -3,10 +3,8 @@
     <TargetFramework>net5</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Block.Core\Block.Core.fsproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="ConstraintProto.fs" />
+    <Compile Include="Constraint\ConstraintProto.fs" />
+    <Compile Include="Constraint\ConstraintTests.fs" />
     <Compile Include="TypeGenerators.fs" />
     <Compile Include="BlockAccessorTests.fs" />
     <Compile Include="HostAccessorTests.fs" />
@@ -16,7 +14,7 @@
     <PackageReference Include="Expecto" Version="9.0.2" />
     <PackageReference Include="Expecto.FsCheck" Version="9.0.2" />
     
-    <PackageReference Include="Expecto.VisualStudio.TestAdapter" Version="10.0.2" />
+    <!-- <PackageReference Include="Expecto.VisualStudio.TestAdapter" Version="10.0.2" /> -->
     
     <PackageReference Include="Fare" Version="2.1.2" /><!-- Required to run expecto tests standard .net tools -->
     <PackageReference Include="FsUnit" Version="4.0.2" />
@@ -32,5 +30,8 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="YoloDev.Expecto.TestSdk" Version="0.9.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Block.Core\Block.Core.fsproj" />
   </ItemGroup>
 </Project>

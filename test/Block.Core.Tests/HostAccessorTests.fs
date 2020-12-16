@@ -1,14 +1,10 @@
 module HostAccessorTests
-open Xunit
-// open FsUnit.Xunit
 open HostsFileAccessor
 open Expecto
 open FsUnit.Xunit
 
 open FsCheck
 open TypeGenerators
-open ConstraintProto
-open Constraint
 
 
 //TODO: How do I achieve a test api? I think I have to do a reader monad... I can't inject into a module or namespace. I could define everything in an object, but that's yucky
@@ -108,29 +104,17 @@ let ``HostAccessor In-Memory Array`` =
     ]
 
 
-[<Tests>]
-let ``Section Writer Tests`` = 
-    let mutable records = [];
-    let reader () = Ok records
-    let writer lines = records <- lines
+// [<Tests>]
+// let ``Section Writer Tests`` = 
+//     let mutable records = [];
+//     let reader () = Ok records
+//     let writer lines = records <- lines
 
-    testList "Host Accessor Spec" [
-        BuildHostAccessorTests (getRecords reader) (writeAll writer) ()
-        BuildExampleBasedRegexTests ()
-    ]
+//     testList "Host Accessor Spec" [
+//         BuildHostAccessorTests (getRecords reader) (writeAll writer) ()
+//         BuildExampleBasedRegexTests ()
+//     ]
        
 // need to test the section reader/writer to make sure it doesn't mess up surroundings
 
 // next build a UI? or do I make the scheduler?
-
-[<Fact>]
-let ``Constraint Tests`` () =
-    let smallMoney = (or' (matchRegex @"^\$\d+$") (oneOf ["0"])) &&& maxLength 5
-    let sm = validate smallMoney
-
-    //I'd be good to have a not in, 
-    let pickyRange = max 10 &&& min 0 &&& oneOf [3; 4; 5; 11]
-    let pr = validate pickyRange 
-    let smResults = [(sm "$5"); (sm "5"); sm "10000000"; sm "0"] 
-    let prResults = [pr 3; pr 6; pr 11]
-    ()
