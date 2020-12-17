@@ -20,11 +20,7 @@ module Expect =
 type HostAccessorApi<'a, 'err> = {getRecords: (unit -> Result<HostRecord list, 'err>); writeAll: (HostRecord list -> 'a)}
 
 let BuildHostAccessorTests testApiProvider () =
-    let config = FsCheckConfig.defaultConfig |> (Arb.registerWithExpecto typeof<HostRecordGen>)
-                    //|> (Gen.registerWithExpecto typeof<DomainGen>
-                    //>> Gen.registerWithExpecto typeof<MetaGen>
-                    //>> Gen.registerWithExpecto typeof<IPGen>
-                    //>> Gen.registerWithExpecto typeof<HostRecordGen>)
+    let config = HostRecordGen.registerAll FsCheckConfig.defaultConfig
 
     let testProperty' name property = testPropertyWithConfig config name property
         
@@ -53,8 +49,7 @@ let BuildHostAccessorTests testApiProvider () =
                     testApi.writeAll records |> ignore
                     let expected = records
                     let actual = (Expect.wantOk' (testApi.getRecords ()))
-                    let isSuccess = actual = expected
-                    // NOTE: potential alternative is to compose an Arb for the composite type and use Prop.forAll 
+                    let isSuccess = actual = expected 
                     isSuccess
                 ) 
         ]
@@ -126,6 +121,7 @@ let ``Section Writer Tests`` =
         let writer lines = SectionWriter.writeSection stream sectionId lines
         {getRecords = (getRecords reader); writeAll = (writeAll writer)}
 
+
     testList "HostAccessor with SectionWriter" [
         BuildHostAccessorTests testApiProvider ()
     ]
@@ -137,3 +133,9 @@ let buildSectionWriterTests () =
 // need to test the section reader/writer to make sure it doesn't mess up surroundings
 
 // next build a UI? or do I make the scheduler?
+
+
+// check if I can run tests in isolation
+// figure out test cases
+
+// could make testApi disposable to pass on the dispose to stream and prevent any leaks

@@ -70,4 +70,24 @@ Does it make sense to separate a manager and accessor?
 - What would cause me to split off a different accessor?
   - association of the data to different entitites in different contexts
   - non-trivial logic around access or managing owned types
-  - 
+
+
+
+## Test Api
+
+Using a builder with individual parameters making up the testApi failed because it leaks state between tests
+
+
+It look like there are four viable solutions
+- Pass a class constructor, and the class is IDisposable
+  - Con: requires an explicit interface if I want multiple implementations
+- Use testFixture to manage setup and teardown
+  - Con: a list of partial tests is not a list of tests and cannot be composed in a test list or labeled without applying the fixture
+  - I could pass the factory down through the builders, letting each layer treat it's return as a test list
+  - Pro: idomatic to FP
+- I thought I could just pass a function that takes unit, but that doesn't let me manage cleanup
+- Oh! The constructor/provider can return Dispose as part of the API, A bit messy, but works
+- a testfixture/testApi reader monad expression
+  - leave the api application implicit / part of the computation expression
+
+There doesn't appear to be a way to implement IDisposable on a record or tuple

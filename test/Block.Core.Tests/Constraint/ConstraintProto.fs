@@ -174,25 +174,6 @@ module Constraint =
     //                                <| DefaultValidations.validatePredicate value
     //    reduceToGen constraint'
 
-    // Could possibly flatten into an array of AND groups? then I can split them between source and filter types
-    // compatible sources can be anded together 
-    // finding range overlap, finding choice options in a range and regexes together, eliminate choices not compatible with regex
-    // The interpretation of length depends on the type... I think we handle it by string and list cases. Those are the main groups
-    // Then filter on custom,
-    // If incompatible constraints are specified (max int + minLength) then return an error
-    // Another issue is that range appears to only apply for ints. I'd need a separate string range concept, or more likely just error for min/max with strings
-    // I still want to handle the DU, Guid, and other valid comparables though...
-
-    // The experimental branch of hedgehog can combine generators https://github.com/hedgehogqa/fsharp-hedgehog-experimental
-    // However, they seem like they might just be filters. I also don't know that I want to support hedgehog who forked and didn't even try to contribute to FsCheck
-
-    //TOOL: not what i'm looking for, but cool https://github.com/fscheck/FsCheck/issues/177
-
-// How should I handle errors? 
-// the value will be available up front and isn't necessary in the return type
-// I could just return the constraint, but what about nesting? I think i'd need to return a tree?
-// how do I apply to aggregated types? I either need to map properties manually
-// (and probably add some helper for naming properties in the errors) or use reflection. Maybe a separate union for representing a tree of (proptery * constraint)
 
 //type ComplexTypeConstraint = 
 //| PropertyConstraint of System.Reflection.PropertyInfo * Constraint

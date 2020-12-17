@@ -5,12 +5,14 @@
   <ItemGroup>
     <Compile Include="TestLabels.fs" />
     <Compile Include="BlockRuleManagerTests.fs" />
+    <None Include="Constraint\Design.md" />
     <Compile Include="Constraint\ConstraintProto.fs" />
     <Compile Include="Constraint\ConstraintTests.fs" />
     <Compile Include="TypeGenerators.fs" />
     <Compile Include="HostAccessorTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
     <PackageReference Include="Expecto" Version="9.0.2" />
     <PackageReference Include="Expecto.FsCheck" Version="9.0.2" />
