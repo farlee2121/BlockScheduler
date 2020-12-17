@@ -1,8 +1,5 @@
 ﻿module ConstraintProto
 
-open FsCheck
-open Fare
-
 type Constraint<'a> = 
     | MaxLength of int
     | MinLength of int
@@ -149,8 +146,10 @@ module Constraint =
     //TODO: Explain should allow them to pass a config with overrides. At least a map between custom tests and message formatters 
 
 
-    //module DefaultGenerators =
-    //    let minGen = () 
+    module DefaultGenerators =
+        open FsCheck
+        open Fare
+        let minGen = () 
 
     //    let regexGen pattern = 
     //        Gen.sized (fun size ->
@@ -162,6 +161,7 @@ module Constraint =
 
 
     //let toGen constraint' =
+    //    let ignore = id
     //    let reduceToGen = catamorph 
     //                                <| DefaultValidations.validateMaxLength value
     //                                <| DefaultValidations.validateMinLength value
@@ -183,6 +183,10 @@ module Constraint =
     // Another issue is that range appears to only apply for ints. I'd need a separate string range concept, or more likely just error for min/max with strings
     // I still want to handle the DU, Guid, and other valid comparables though...
 
+    // The experimental branch of hedgehog can combine generators https://github.com/hedgehogqa/fsharp-hedgehog-experimental
+    // However, they seem like they might just be filters. I also don't know that I want to support hedgehog who forked and didn't even try to contribute to FsCheck
+
+    //TOOL: not what i'm looking for, but cool https://github.com/fscheck/FsCheck/issues/177
 
 // How should I handle errors? 
 // the value will be available up front and isn't necessary in the return type

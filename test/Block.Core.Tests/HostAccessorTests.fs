@@ -6,6 +6,7 @@ open FsUnit.Xunit
 open FsCheck
 open TypeGenerators
 open System.IO
+open TestLabels
 
 
 //TODO: How do I achieve a test api? I think I have to do a reader monad... I can't inject into a module or namespace. I could define everything in an object, but that's yucky
@@ -16,8 +17,10 @@ module Expect =
     let equal' actual expected = Expect.equal actual expected "Should be equal"
     let wantOk' result = Expect.wantOk result "Expected Ok got Error"
 
-let BuildHostAccessorTests getRecords writeAll () =
-    let config = FsCheckConfig.defaultConfig |> (Gen.registerWithExpecto typeof<HostRecordGen>)
+type HostAccessorApi<'a, 'err> = {getRecords: (unit -> Result<HostRecord list, 'err>); writeAll: (HostRecord list -> 'a)}
+
+let BuildHostAccessorTests testApiProvider () =
+    let config = FsCheckConfig.defaultConfig |> (Arb.registerWithExpecto typeof<HostRecordGen>)
                     //|> (Gen.registerWithExpecto typeof<DomainGen>
                     //>> Gen.registerWithExpecto typeof<MetaGen>
                     //>> Gen.registerWithExpecto typeof<IPGen>
@@ -27,30 +30,34 @@ let BuildHostAccessorTests getRecords writeAll () =
         
     testList "HostAccessorTests" [
         test "List Records Empty When None Written" {
-            let records = getRecords ()
+            let testApi = testApiProvider ()
+            let records = testApi.getRecords ()
             Expect.isEmpty (Expect.wantOk' records) ""
         }
 
-        testProperty' "Single record: read equals write" 
+        testProperty'  "Single record: read equals write" 
             <| (fun (record:HostRecord) -> 
-                    writeAll [record] |> ignore
-                    let actual = (Expect.wantOk' (getRecords ()))
+                    let testApi = testApiProvider ()
+                    
+                    testApi.writeAll [record] |> ignore
+                    let actual = (Expect.wantOk' (testApi.getRecords ()))
                     let isSuccess = actual = [record]
                     // NOTE: potential alternative is to compose an Arb for the composite type and use Prop.forAll 
                     isSuccess
                 )
 
-        testProperty' "Multi-record: read equals write" 
+        testPropertyWithConfig { config with endSize = 5 } "Multi-record: read equals write" 
             <| (fun (records:HostRecord list) -> 
-                    writeAll records |> ignore
+                    let testApi = testApiProvider ()
+                    
+                    testApi.writeAll records |> ignore
                     let expected = records
-                    let actual = (Expect.wantOk' (getRecords ()))
+                    let actual = (Expect.wantOk' (testApi.getRecords ()))
                     let isSuccess = actual = expected
                     // NOTE: potential alternative is to compose an Arb for the composite type and use Prop.forAll 
                     isSuccess
-                )
-    ]
-
+                ) 
+        ]
 
 let BuildExampleBasedRegexTests () =
     // a fallback to make sure the property test hits important cases
@@ -96,12 +103,15 @@ let BuildExampleBasedRegexTests () =
 
 [<Tests>]
 let ``HostAccessor In-Memory Array`` = 
-    let mutable records = [];
-    let reader () = Ok records
-    let writer lines = records <- lines
+    
+    let testApiProvider () =
+        let mutable records = [];
+        let reader () = Ok records
+        let writer lines = records <- lines
+        {getRecords = (getRecords reader); writeAll = (writeAll writer)}
 
     testList "Host Accessor Spec" [
-        BuildHostAccessorTests (getRecords reader) (writeAll writer) ()
+        BuildHostAccessorTests testApiProvider ()
         BuildExampleBasedRegexTests ()
     ]
 
@@ -109,13 +119,15 @@ let ``HostAccessor In-Memory Array`` =
 [<Tests>]
 let ``Section Writer Tests`` = 
 
-    let sectionId = SectionWriter.SectionId "Block Test"
-    let stream = (new MemoryStream());
-    let reader () = SectionWriter.readSection stream sectionId () |> Ok
-    let writer lines = SectionWriter.writeSection stream sectionId lines
+    let testApiProvider () =
+        let sectionId = SectionWriter.SectionId "Block Test"
+        let stream = (new MemoryStream());
+        let reader () = SectionWriter.readSection stream sectionId () |> Ok
+        let writer lines = SectionWriter.writeSection stream sectionId lines
+        {getRecords = (getRecords reader); writeAll = (writeAll writer)}
 
     testList "HostAccessor with SectionWriter" [
-        BuildHostAccessorTests (getRecords reader) (writeAll writer) ()
+        BuildHostAccessorTests testApiProvider ()
     ]
 
 

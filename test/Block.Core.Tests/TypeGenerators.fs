@@ -19,36 +19,35 @@ let matching pattern =
     
 
 //type MetaGen =
-    
+module Arb =
+    let registerWithExpecto type' config = { config with arbitrary = type' :: config.arbitrary }
         
 type HostRecordGen =
-    static member HostRecord() : Arbitrary<HostRecord> =
-        Arb.Default.Derive<HostRecord> () |> Arb.filter ((=) (HostRecord.Other null))
+    static member hostRecordArb () = 
+        Gen.oneof [ 
+            Arb.Default.Derive<IP * DomainUrl * Meta option> () |> Arb.toGen |> Gen.map (Registration);
+            matching @"^[^\n\r]+$" |> Gen.map (HostRecord.Other)
+        ]
+        |> Arb.fromGen
 
-    static member Meta() : Arbitrary<Meta option> =
-        let regexGenerator = matching @"^[^#\n\r]+[^\n\r\s]+[^\n\r]*$" |> Gen.map (Meta >> Some)
-        let generator = Gen.oneof [regexGenerator; Gen.constant None]
-        let arb = generator |> Arb.fromGen
-        arb
-
-    static member Domain() : Arbitrary<DomainUrl> =
-        //IMPORTANT: requires ^ and $ or it might create nulls (maybe because of multi-line?)
+    static member metaOptionArb () = 
+        let regexGenerator = matching @"^[^#\n\r]+[^\n\r\s]+[^\n\r]*$" |> Gen.map (Meta)
+        regexGenerator |> Arb.fromGen
         
-        let generator = matching @"^[a-zA-Z0-9\-\.]+\.[a-xA-Z]+\\?$" |> Gen.map (Domain)
-        let arb = generator |> Arb.fromGen
-        arb
+    static member domainArb () =
+        //IMPORTANT: requires ^ and $ or it might create nulls (maybe because of multi-line?)
+        matching @"^[a-zA-Z0-9\-\.]+\.[a-xA-Z]+\\?$" |> Gen.map (Domain)
+        |> Arb.fromGen
+        
 
-    static member IP() : Arbitrary<IP> =
-        let generator = matching @"^(\d+\.){3}\d+$" |> Gen.map (IP)
-        let arb = generator |> Arb.fromGen
-        arb
+    static member ipArb () : Arbitrary<IP> =
+        matching @"^(\d+\.){3}\d+$" |> Gen.map (IP)
+        |> Arb.fromGen
+        
+    static member registerAll = Arb.registerWithExpecto typeof<HostRecordGen>
 
 
 //NOTE: The other method is a sneaky extension of Gen. It is important that the type itself has a definition in the module
 //      trying to extend the initial type causes issues with finding the extension method... maybe I need to put the extension in an auto open module?
 //SOURCE: https://github.com/haf/expecto#property-based-tests
 //Could also look into a convention-based (typeclass?) registration like in https://github.com/fscheck/FsCheck/issues/334
-
-
-module Gen =
-    let registerWithExpecto type' config = { config with arbitrary = type' :: config.arbitrary }
