@@ -39,10 +39,6 @@ module HostRecord =
         | Registration (ip, domain, meta) -> fRegistration ip domain meta
         | Other str -> fOther str
 
-type FileLine = 
-    | SafeSection of HostRecord 
-    | UnsafeSection of string
-
 type AddRecordError = 
     | Other of string // uhh, I'm sure there will be reasons 
 
@@ -89,7 +85,7 @@ let writeAll writeLines records =
 
 
 
-module SectionApi = 
+module SectionWriter = 
     type SectionId = | SectionId of string
 
     let getStartMarker (SectionId sectionId) = sprintf "# start %s" sectionId
@@ -105,8 +101,8 @@ module SectionApi =
         let split = 
             match (startIndex, endIndex) with
             | (Some starti, Some endi) -> 
-                let (beforeSection, sectionAndAfter) = lines |> List.splitAt starti 
-                let (sectionWithMarkers, afterSection) = sectionAndAfter |> List.splitAt endi
+                let (beforeSection, sectionAndAfter) = lines |> List.splitAt (starti)  
+                let (sectionWithMarkers, afterSection) = sectionAndAfter |> List.splitAt (endi + 1)
                 let sectionWithoutMarkers = sectionWithMarkers |> (reverseTail >> List.tail)
                 (beforeSection, sectionWithoutMarkers, afterSection)
             | (None, _) | (_, None) -> (lines,[],[])
@@ -120,6 +116,6 @@ module SectionApi =
 
     let writeSection stream sectionId lines = 
         let (before, section, after) = StreamExtensions.Stream.ReadAllLines stream  |> splitOnSection sectionId
-        let updatedLines = List.concat [before; [getEndMarker sectionId]; lines; [getEndMarker sectionId]; after]
+        let updatedLines = List.concat [before; [getStartMarker sectionId]; lines; [getEndMarker sectionId]; after]
         StreamExtensions.Stream.WriteAllLines stream updatedLines
 

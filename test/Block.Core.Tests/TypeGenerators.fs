@@ -12,13 +12,25 @@ let matching pattern =
         |> Gen.elements
         |> Gen.resize count)
 
-type IPGen =
-    static member IP() : Arbitrary<IP> =
-        let generator = matching @"^(\d+\.){3}\d+$" |> Gen.map (IP)
+//type IPGen = 
+    
+
+//type DomainGen =
+    
+
+//type MetaGen =
+    
+        
+type HostRecordGen =
+    static member HostRecord() : Arbitrary<HostRecord> =
+        Arb.Default.Derive<HostRecord> () |> Arb.filter ((=) (HostRecord.Other null))
+
+    static member Meta() : Arbitrary<Meta option> =
+        let regexGenerator = matching @"^[^#\n\r]+[^\n\r\s]+[^\n\r]*$" |> Gen.map (Meta >> Some)
+        let generator = Gen.oneof [regexGenerator; Gen.constant None]
         let arb = generator |> Arb.fromGen
         arb
 
-type DomainGen =
     static member Domain() : Arbitrary<DomainUrl> =
         //IMPORTANT: requires ^ and $ or it might create nulls (maybe because of multi-line?)
         
@@ -26,10 +38,8 @@ type DomainGen =
         let arb = generator |> Arb.fromGen
         arb
 
-type MetaGen =
-    static member Meta() : Arbitrary<Meta option> =
-        let regexGenerator = matching @"^[^#\n\r]+[^\n\r\s]+[^\n\r]*$" |> Gen.map (Meta >> Some)
-        let generator = Gen.oneof [regexGenerator; Gen.constant None]
+    static member IP() : Arbitrary<IP> =
+        let generator = matching @"^(\d+\.){3}\d+$" |> Gen.map (IP)
         let arb = generator |> Arb.fromGen
         arb
 

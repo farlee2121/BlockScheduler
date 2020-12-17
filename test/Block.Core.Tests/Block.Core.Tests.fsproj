@@ -3,6 +3,7 @@
     <TargetFramework>net5</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="BlockRuleManagerTests.fs" />
     <Compile Include="Constraint\ConstraintProto.fs" />
     <Compile Include="Constraint\ConstraintTests.fs" />
     <Compile Include="TypeGenerators.fs" />

@@ -5,6 +5,7 @@ open FsUnit.Xunit
 
 open FsCheck
 open TypeGenerators
+open System.IO
 
 
 //TODO: How do I achieve a test api? I think I have to do a reader monad... I can't inject into a module or namespace. I could define everything in an object, but that's yucky
@@ -16,10 +17,11 @@ module Expect =
     let wantOk' result = Expect.wantOk result "Expected Ok got Error"
 
 let BuildHostAccessorTests getRecords writeAll () =
-    let config = FsCheckConfig.defaultConfig 
-                    |> (Gen.registerWithExpecto typeof<DomainGen>
-                    >> Gen.registerWithExpecto typeof<MetaGen>
-                    >> Gen.registerWithExpecto typeof<IPGen>)
+    let config = FsCheckConfig.defaultConfig |> (Gen.registerWithExpecto typeof<HostRecordGen>)
+                    //|> (Gen.registerWithExpecto typeof<DomainGen>
+                    //>> Gen.registerWithExpecto typeof<MetaGen>
+                    //>> Gen.registerWithExpecto typeof<IPGen>
+                    //>> Gen.registerWithExpecto typeof<HostRecordGen>)
 
     let testProperty' name property = testPropertyWithConfig config name property
         
@@ -104,16 +106,21 @@ let ``HostAccessor In-Memory Array`` =
     ]
 
 
-// [<Tests>]
-// let ``Section Writer Tests`` = 
-//     let mutable records = [];
-//     let reader () = Ok records
-//     let writer lines = records <- lines
+[<Tests>]
+let ``Section Writer Tests`` = 
 
-//     testList "Host Accessor Spec" [
-//         BuildHostAccessorTests (getRecords reader) (writeAll writer) ()
-//         BuildExampleBasedRegexTests ()
-//     ]
+    let sectionId = SectionWriter.SectionId "Block Test"
+    let stream = (new MemoryStream());
+    let reader () = SectionWriter.readSection stream sectionId () |> Ok
+    let writer lines = SectionWriter.writeSection stream sectionId lines
+
+    testList "HostAccessor with SectionWriter" [
+        BuildHostAccessorTests (getRecords reader) (writeAll writer) ()
+    ]
+
+
+let buildSectionWriterTests () = 
+    ()
        
 // need to test the section reader/writer to make sure it doesn't mess up surroundings
 
