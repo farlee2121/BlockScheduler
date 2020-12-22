@@ -17,7 +17,6 @@
     <PackageReference Include="Expecto" Version="9.0.2" />
     <PackageReference Include="Expecto.FsCheck" Version="9.0.2" />
     
-    <!-- <PackageReference Include="Expecto.VisualStudio.TestAdapter" Version="10.0.2" /> -->
     
     <PackageReference Include="Fare" Version="2.1.2" /><!-- Required to run expecto tests standard .net tools -->
     <PackageReference Include="FsUnit" Version="4.0.2" />

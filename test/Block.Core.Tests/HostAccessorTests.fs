@@ -12,43 +12,68 @@ open TestLabels
 //TODO: How do I achieve a test api? I think I have to do a reader monad... I can't inject into a module or namespace. I could define everything in an object, but that's yucky
 // well, even using a reader monad I have to somehow let it be specified external to the test suite and applied to all tests. An expecto test list would be better here 
 
-
 module Expect = 
     let equal' actual expected = Expect.equal actual expected "Should be equal"
     let wantOk' result = Expect.wantOk result "Expected Ok got Error"
 
-type HostAccessorApi<'a, 'err> = {getRecords: (unit -> Result<HostRecord list, 'err>); writeAll: (HostRecord list -> 'a)}
+type HostAccessorApi<'a, 'err> = { GetRecords: (unit -> Result<HostRecord list, 'err>); WriteAll: (HostRecord list -> 'a)}
 
-let BuildHostAccessorTests testApiProvider () =
+let testWithEnv setup cleanup name test = 
+    let testWrap () = 
+        let (api, env) = setup ()
+        test api
+        cleanup env 
+    testCase name testWrap
+
+let testPropertyWithEnvAndConfig setup cleanup config name prop =
+    // IMPORTANT: the closest i've gotten, but only running setup once and not running the cleanup (because it doesn't find a match in the dictionary)
+    let envdict = (new System.Collections.Generic.Dictionary<obj,'b>())
+    let prop' = lazy(
+        let (api, env) = setup ()
+        envdict.Add(api :> obj, env)
+        prop api
+        )
+    let receiveArgsWithClean defaultReceiveArgs' = (fun config name testNum (args:obj list) -> 
+                            printfn "running cleanup"
+
+                            args |> List.map (function 
+                            | arg when envdict.ContainsKey(arg) -> 
+                                printfn "running cleanup %O" envdict.[arg]
+                                cleanup envdict.[arg]
+                            | _ -> () ) |> ignore
+                            defaultReceiveArgs' config name testNum args
+                        ) 
+    let configWithCleanup = { config with receivedArgs = receiveArgsWithClean config.receivedArgs }
+
+    testPropertyWithConfig configWithCleanup name prop'
+
+
+let BuildHostAccessorTests setup cleanup () =
     let config = HostRecordGen.registerAll FsCheckConfig.defaultConfig
 
-    let testProperty' name property = testPropertyWithConfig config name property
+    let test' = testWithEnv setup cleanup
+    let testProperty' name = testPropertyWithEnvAndConfig setup cleanup config name
+    let testPropertyWithConfig' _config name = testPropertyWithEnvAndConfig setup cleanup _config name 
         
     testList "HostAccessorTests" [
-        test "List Records Empty When None Written" {
-            let testApi = testApiProvider ()
-            let records = testApi.getRecords ()
+        test' "List Records Empty When None Written" <| fun testApi ->
+            let records = testApi.GetRecords ()
             Expect.isEmpty (Expect.wantOk' records) ""
-        }
 
         testProperty'  "Single record: read equals write" 
-            <| (fun (record:HostRecord) -> 
-                    let testApi = testApiProvider ()
-                    
-                    testApi.writeAll [record] |> ignore
-                    let actual = (Expect.wantOk' (testApi.getRecords ()))
+            <| (fun (testApi) (record:HostRecord) -> 
+                    testApi.WriteAll [record] |> ignore
+                    let actual = (Expect.wantOk' (testApi.GetRecords ()))
                     let isSuccess = actual = [record]
                     // NOTE: potential alternative is to compose an Arb for the composite type and use Prop.forAll 
                     isSuccess
                 )
 
-        testPropertyWithConfig { config with endSize = 5 } "Multi-record: read equals write" 
-            <| (fun (records:HostRecord list) -> 
-                    let testApi = testApiProvider ()
-                    
-                    testApi.writeAll records |> ignore
+        testPropertyWithConfig' { config with endSize = 5 } "Multi-record: read equals write" 
+            <| (fun testApi (records:HostRecord list) ->                    
+                    testApi.WriteAll records |> ignore
                     let expected = records
-                    let actual = (Expect.wantOk' (testApi.getRecords ()))
+                    let actual = (Expect.wantOk' (testApi.GetRecords ()))
                     let isSuccess = actual = expected 
                     isSuccess
                 ) 
@@ -103,10 +128,16 @@ let ``HostAccessor In-Memory Array`` =
         let mutable records = [];
         let reader () = Ok records
         let writer lines = records <- lines
-        {getRecords = (getRecords reader); writeAll = (writeAll writer)}
+        {GetRecords = (getRecords reader); WriteAll = (writeAll writer)}
 
+    let setup () = 
+        let guid = System.Guid.NewGuid()
+        printfn "setup %O" guid
+        (testApiProvider (), guid)
+    let cleanup env = 
+        printfn "cleanup %O" env 
     testList "Host Accessor Spec" [
-        BuildHostAccessorTests testApiProvider ()
+        BuildHostAccessorTests setup cleanup ()
         BuildExampleBasedRegexTests ()
     ]
 
@@ -114,16 +145,18 @@ let ``HostAccessor In-Memory Array`` =
 [<Tests>]
 let ``Section Writer Tests`` = 
 
-    let testApiProvider () =
+    let setup () =
         let sectionId = SectionWriter.SectionId "Block Test"
         let stream = (new MemoryStream());
         let reader () = SectionWriter.readSection stream sectionId () |> Ok
         let writer lines = SectionWriter.writeSection stream sectionId lines
-        {getRecords = (getRecords reader); writeAll = (writeAll writer)}
+        ({GetRecords = (getRecords reader); WriteAll = (writeAll writer)}, stream)
 
+    let cleanup (stream:Stream) = 
+        stream.Dispose()
 
     testList "HostAccessor with SectionWriter" [
-        BuildHostAccessorTests testApiProvider ()
+        BuildHostAccessorTests setup cleanup ()
     ]
 
 

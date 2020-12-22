@@ -42,7 +42,7 @@ type PauseRule = RuleId -> Result<RuleId, string list>
 
 type DeleteRule = RuleId -> Result<RuleId, string list>
 
-type GetRuleList = unit -> BlockRule list
+type ListRules = unit -> BlockRule list
 
 
 

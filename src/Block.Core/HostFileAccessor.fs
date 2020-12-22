@@ -1,9 +1,10 @@
 module HostsFileAccessor
-open System
 open System.IO
 // open FSharpx.Text
 // open System.Text.RegularExpressions
 open FSharp.Text.RegexProvider
+open System
+
 
 // https://github.com/fsprojects/FSharpPlus/ contains various extensions (like for parsing) as well as some approximated type classes (monoids, TryParse,...)
 type DomainUrl = | Domain of string
@@ -49,6 +50,7 @@ type RemoveRecordError =
 type GetRecords<'a> = unit -> Result<HostRecord list, 'a>
 type WriteRecords<'a> = HostRecord list -> 'a
 
+
 let defaultHostPath = "c:/windows/system32/drivers/etc/hosts"
 // let getDefaultHostStream () = System.IO.File.Open(defaultHostPath, )
 // what do I pass to this? A text writer? A file location? a Reader monad?
@@ -82,7 +84,6 @@ let writeAll writeLines records =
     
     // records |> List.map toFileString |> writeAllLines defaultHostPath
     records |> List.map toFileString |> writeLines 
-
 
 
 module SectionWriter = 

@@ -71,7 +71,18 @@ Does it make sense to separate a manager and accessor?
   - association of the data to different entitites in different contexts
   - non-trivial logic around access or managing owned types
 
+Examples seem to be using a Reader-like approach
+- https://www.red-gate.com/simple-talk/dotnet/net-development/creating-your-first-crud-app-with-suave-and-f/
+- https://codereview.stackexchange.com/questions/82260/crud-database-layer-for-f-with-typeproviders?newreg=a857a7b328624470b2908907ede5b561
 
+Should my manager methods accept each of the adapters as a whole contract (reader monad style) or should they accept only the actions they need?
+- only the actions they need 
+  - con: is a bit of a pain to apply
+  - pro: but makes for easier composition.
+  - pro: only need to define as many of the adapter methods as are required by the methods I use
+  - ?: makes it less clear if certain methods are expected to be related 
+- Reader-style
+  - pro: allows command pattern where dependencies can be applied consistently accross actions.. except probably not because I would have to bundle all dependencies of all methods in the service
 
 ## Test Api
 
@@ -144,7 +155,46 @@ let testPropertyDispose disposable property =
     testPropertyWithConfig { FsCheckConfig.defaultConfig with receivedArgs = dispose FsCheckConfig.defaultConfig.receivedArgs } name prop' 
 
 // this would also work with other datastructures like including dispose in a record, or converting the record to a disposable
+// This model would also definitely work with a computation expression / builder if I felt like that was meaningful
 ```
+
+Following the disposable line of thought. I create a `TestWithApiBuilder` that takes a setup and teardown function. Each function accepts an environment / state that the computation expression handles passing off (State monad style?). I need to make sure that the expression can handle it that way... I still might run into the same inference issue. Well, the inference would only be a problem if I'm trying to partially apply, not if the setup outputs the environment
+```fs
+type Setup = () -> 'api * 'env
+type Cleanup = 'api * 'env -> 'a
+
+let testWithEnv setup cleanup name builder = //..
+let testPropertyWithEnv setup cleanup name predicate = //...
+let testPropertyWithEnvAndConfig config setup cleanup name predicate = //...
+```
+
+Hmm. This is a good setup but the computation expression is actually no bueno. I'd still need a getter with any expression. Though I could certainly provide that if I want to use the expression, but I don't think I do.
+
+QUESTION: Do I really need a separate interface? Would it be able to use both types as long as they meet the right structural signatures?
+TEST: I tried creating an object with the same signature as my record type. F# wasn't able to infer the class satisfied the requirements. I had to explicity add a type annotation
+```fs
+type SectionTestApi () =
+    member this.GetRecords () =
+        []
+    member this.WriteAll records = 
+        ()
+```
+
+Interfaces didn't make it better. It wouldn't compile even after annotating to take the interface. I'd have to fix the output type the test list expects in the interface for this to work reasonably. The definitions aren't really any more burdensome than records. The ability to wrap the mutable state is really quite nice. However, the loss of type inference is a big blow.
+```fs
+type ITestApi<'a, 'err> = 
+    abstract member GetRecords: unit -> Result<HostRecord list, 'err>
+    abstract member WriteAll: HostRecord list -> 'a
+    inherit System.IDisposable
+
+type InMemoryTestApi () =
+    let mutable records = []
+    interface ITestApi<unit,string>  with 
+            member this.WriteAll lines = records <- lines 
+            member this.GetRecords () = Ok records
+            member this.Dispose () = ()
+```
+I think this is a big reason to go with a more idomatic structure like a environment/api tuple
 
 
 I was thinking
@@ -158,3 +208,42 @@ type FixtureTest<'a> =
 
 ```
 
+
+
+
+### Tooling sidenote
+
+I was using https://marketplace.visualstudio.com/items?itemName=formulahendry.dotnet-test-explorer&ssr=false#overview
+  Pros
+  - can sometimes figure out going to source in F#
+  - can run tests in parallel
+  - Has run and debug code lenses in c#
+  - tree mode settings [full, merged, flat]
+  - has key bindings by default
+
+  Cons
+  - Slow on discovery
+  - Testing also kinda slow
+  - Need to manually run test discovery
+
+  The speed issue appears to mainly be because of build time. Could solve by using vstest or testing with `--no-build` (and maybe building first if when no test dlls present or leaving it to the user)
+  - looks like they let you turn off build https://github.com/formulahendry/vscode-dotnet-test-explorer/blob/ebe7779a1cb0927e21c6899e8943d6d09a8367c7/src/testCommands.ts#L263
+
+This [newer plug-in](https://marketplace.visualstudio.com/items?itemName=derivitec-ltd.vscode-dotnet-adapter)
+  Pros
+  - Go to code *and* go to test both available in c#
+  - Faster test discovery
+  - automatically discovers tests on build (even if you build from somewhere else)
+  - run and debug buttons in explorer
+  - Run and debug codelense
+  - appears that it would collect tests from multiple languages in one place
+
+  Cons
+  - cannot navigate to code in f#
+  - Test discovery very slow if you don't manually set a search pattern in settings
+  - can't add runsettings,
+    -  but it'd be easy to contribute (add setting to package.json and append it whenever vstest is called)
+  - no default keybindings
+    - easy to contribute, add to local settings, or standardize for a company in custom package
+
+  The only issue not easily fixable is that it is hard to see the proper test path and I have no control over how tests display in the tree (i.e having separate every level into a tree branch)

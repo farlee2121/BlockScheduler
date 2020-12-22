@@ -16,3 +16,4 @@ let ``Constraint Tests`` () =
    let smResults = [(sm "$5"); (sm "5"); sm "10000000"; sm "0"] 
    let prResults = [pr 3; pr 6; pr 11]
    ()
+
