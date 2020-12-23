@@ -13,6 +13,7 @@ module Stream =
         writer.Flush();
         Rewind stream
 
+
     let ReadAllLines (stream:Stream) = 
         let rec ReadAllLinesRec (streamReader:StreamReader) = 
             // I think I could also do this with a list/sequence comprehension?
@@ -27,3 +28,8 @@ module Stream =
         writer.Write(text)
         writer.Flush()
         Rewind stream
+
+    let ReadAllText (stream:Stream) = 
+        let reader = new StreamReader(stream);
+        let text = reader.ReadToEnd ()
+        text

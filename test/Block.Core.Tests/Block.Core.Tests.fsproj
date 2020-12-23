@@ -3,7 +3,7 @@
     <TargetFramework>net5</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="TestLabels.fs" />
+    <Compile Include="ExpectoExtensions.fs" />
     <Compile Include="BlockRuleManagerTests.fs" />
     <None Include="Constraint\Design.md" />
     <Compile Include="Constraint\ConstraintProto.fs" />

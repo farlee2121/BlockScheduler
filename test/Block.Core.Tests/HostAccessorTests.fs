@@ -6,46 +6,9 @@ open FsUnit.Xunit
 open FsCheck
 open TypeGenerators
 open System.IO
-open TestLabels
-
-
-//TODO: How do I achieve a test api? I think I have to do a reader monad... I can't inject into a module or namespace. I could define everything in an object, but that's yucky
-// well, even using a reader monad I have to somehow let it be specified external to the test suite and applied to all tests. An expecto test list would be better here 
-
-module Expect = 
-    let equal' actual expected = Expect.equal actual expected "Should be equal"
-    let wantOk' result = Expect.wantOk result "Expected Ok got Error"
+open ExpectoExtensions
 
 type HostAccessorApi<'a, 'err> = { GetRecords: (unit -> Result<HostRecord list, 'err>); WriteAll: (HostRecord list -> 'a)}
-
-let testWithEnv setup cleanup name test = 
-    let testWrap () = 
-        let (api, env) = setup ()
-        test api
-        cleanup env 
-    testCase name testWrap
-
-let testPropertyWithEnvAndConfig setup cleanup config name prop =
-    // IMPORTANT: the closest i've gotten, but only running setup once and not running the cleanup (because it doesn't find a match in the dictionary)
-    let envdict = (new System.Collections.Generic.Dictionary<obj,'b>())
-    let prop' = lazy(
-        let (api, env) = setup ()
-        envdict.Add(api :> obj, env)
-        prop api
-        )
-    let receiveArgsWithClean defaultReceiveArgs' = (fun config name testNum (args:obj list) -> 
-                            printfn "running cleanup"
-
-                            args |> List.map (function 
-                            | arg when envdict.ContainsKey(arg) -> 
-                                printfn "running cleanup %O" envdict.[arg]
-                                cleanup envdict.[arg]
-                            | _ -> () ) |> ignore
-                            defaultReceiveArgs' config name testNum args
-                        ) 
-    let configWithCleanup = { config with receivedArgs = receiveArgsWithClean config.receivedArgs }
-
-    testPropertyWithConfig configWithCleanup name prop'
 
 
 let BuildHostAccessorTests setup cleanup () =
@@ -143,7 +106,7 @@ let ``HostAccessor In-Memory Array`` =
 
 
 [<Tests>]
-let ``Section Writer Tests`` = 
+let ``HostAccessor with SectionWriter`` = 
 
     let setup () =
         let sectionId = SectionWriter.SectionId "Block Test"
@@ -160,15 +123,26 @@ let ``Section Writer Tests`` =
     ]
 
 
-let buildSectionWriterTests () = 
-    ()
+type SectionWriterTestApi = { 
+    ReadSection: SectionWriter.SectionId -> string list;
+    WriteSection: SectionWriter.SectionId -> string list -> unit;
+    // ReadFullDoc: unit -> string list
+}
+
+let buildSectionWriterTests setup cleanup = 
+    let test' = testWithEnv setup cleanup
+
+    // blank document
+    // document with no section, but other content
+    // document with partial section
+    // document with existing section and other content
+    
+    // QUESTION: do I add methods for adding content outside the section? is it worth abstracting the underlying section division?
+    //          I could also create a type for |OutsideSection | InSection as a sort of builder
+    //          The public api doesn't know about non-section content though, so maybe here I just make sure sections stay separate and leave 
+
+    // Plan: blackbox test that sections stay separate, whitebox test against a stream to make sure it doesn't erase other file content  
+    testList "meow" [
+
+    ]
        
-// need to test the section reader/writer to make sure it doesn't mess up surroundings
-
-// next build a UI? or do I make the scheduler?
-
-
-// check if I can run tests in isolation
-// figure out test cases
-
-// could make testApi disposable to pass on the dispose to stream and prevent any leaks
