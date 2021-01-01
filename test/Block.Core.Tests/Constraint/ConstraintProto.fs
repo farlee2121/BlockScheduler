@@ -28,6 +28,30 @@ module Constraint =
         | Custom (name, predicate)  -> customf (name, predicate)
         //....
 
+
+    let rec fold maxLengthf minLengthf maxf minf regexf choicef andf orf customf state constraint' : 'r= 
+        //WARNING: this is not actually optimized to tail recursion. 
+        // https://github.com/dotnet/fsharp/issues/6984 and I think list fold isn't inline, also preventing the optimization
+        let recurse = fold maxLengthf minLengthf maxf minf regexf choicef andf orf customf 
+        match constraint' with
+        | MaxLength len -> maxLengthf state len
+        | MinLength len -> minLengthf state len
+        | Regex expr -> regexf state expr
+        | Choice list -> choicef state list
+        | Max limit -> maxf state limit
+        | Min limit -> minf state limit
+        | And children -> 
+            let newAcc = andf state
+            children |> List.fold recurse newAcc 
+        | Or children -> 
+            let newAcc = orf state
+            children |> List.fold recurse newAcc 
+        | Custom (name, predicate)  -> customf state (name, predicate)
+
+    //let foldBack maxLengthf minLengthf maxf minf regexf choicef andf orf customf constraint' state : 'r = 
+    //    let acc = 
+    //    fold maxLengthf minLengthf maxf minf regexf choicef andf orf customf state constraint' 
+
     let (&&&) left right = And [left; right]
     let and' left right = And [left; right]
     let andAll list = And list
@@ -142,6 +166,29 @@ module Constraint =
                                     <| DefaultValidations.validatePredicate value
                                     //avoiding avoiding DefaultValidations.validateMax avoiding avoiding avoiding (DefaultValidations.validateAnd) avoiding avoiding
         reduceToResultForValue constraint'
+
+    //IMPORTANT:NOTE: validation cannot be implemented with a proper fold. think about it from the iteration standpoint, I'd have to have
+    //                some kind of extra condition that tells me 
+    type ResultCombinationOperation = | And | Or
+    let validateFold constraint' value = 
+        let combineByState (operation, accResult) nextResult = 
+            match operation with
+            | ResultCombinationOperation.And -> (operation, DefaultValidations.validateAnd [accResult; nextResult])
+            | ResultCombinationOperation.Or -> (operation, DefaultValidations.validateOr [accResult; nextResult])
+            
+        let reduceToResultForValue = fold 
+                                    <| (fun state maxLen -> combineByState state (DefaultValidations.validateMaxLength value maxLen)) // I don't think this is really better than the direct lambdas
+                                    <| (fun state minLen -> combineByState state (DefaultValidations.validateMinLength value minLen))
+                                    <| (fun state max -> combineByState state (DefaultValidations.validateMax value max))
+                                    <| (fun state min -> combineByState state (DefaultValidations.validateMin value min))
+                                    <| (fun state regex -> combineByState state (DefaultValidations.validateRegex value regex))
+                                    <| (fun state choices -> combineByState state (DefaultValidations.validateChoice value choices))
+                                    <| (fun (_, accResult) -> (ResultCombinationOperation.And, accResult))
+                                    <| (fun (_, accResult) -> (ResultCombinationOperation.Or, accResult))
+                                    <| (fun state custom -> combineByState state (DefaultValidations.validatePredicate value custom))
+                                    <| (ResultCombinationOperation.And, (Ok value))
+        let (op, result) = reduceToResultForValue constraint'
+        result
 
     //TODO: Explain should allow them to pass a config with overrides. At least a map between custom tests and message formatters 
 

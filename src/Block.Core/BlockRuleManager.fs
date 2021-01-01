@@ -19,6 +19,10 @@ module Minute =
         | _ -> None  
 
 type TimeOfDay = | TimeOfDay of Hour * Minute
+                    member this.ToDateTime () = 
+                        match this with
+                        | TimeOfDay (Hour h, Minute m) -> DateTime(year = 0, month = 0, day = 0, hour = h, minute = m, second = 0)
+
 type TimeRange = { Start: TimeOfDay; End: TimeOfDay }
 
 type Day = | Sunday | Monday | Tuesday | Wednesday | Thursday | Friday | Saturday

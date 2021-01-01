@@ -15,8 +15,9 @@ let BuildHostAccessorTests setup cleanup () =
     let config = HostRecordGen.registerAll FsCheckConfig.defaultConfig
 
     let test' = testWithEnv setup cleanup
-    let testProperty' name = testPropertyWithEnvAndConfig setup cleanup config name
-    let testPropertyWithConfig' _config name = testPropertyWithEnvAndConfig setup cleanup _config name 
+    let testProperty' name = testPropertyWithConfig config name
+    let withEnv' = withEnv setup cleanup
+    
         
     testList "HostAccessorTests" [
         test' "List Records Empty When None Written" <| fun testApi ->
@@ -24,22 +25,23 @@ let BuildHostAccessorTests setup cleanup () =
             Expect.isEmpty (Expect.wantOk' records) ""
 
         testProperty'  "Single record: read equals write" 
-            <| (fun (testApi) (record:HostRecord) -> 
+            <| (fun (record:HostRecord) -> withEnv' (fun testApi ->
                     testApi.WriteAll [record] |> ignore
                     let actual = (Expect.wantOk' (testApi.GetRecords ()))
                     let isSuccess = actual = [record]
                     // NOTE: potential alternative is to compose an Arb for the composite type and use Prop.forAll 
                     isSuccess
-                )
+                    
+            ))
 
-        testPropertyWithConfig' { config with endSize = 5 } "Multi-record: read equals write" 
-            <| (fun testApi (records:HostRecord list) ->                    
+        testPropertyWithConfig { config with endSize = 5 } "Multi-record: read equals write" 
+                (fun (records:HostRecord list) -> withEnv' (fun testApi ->                   
                     testApi.WriteAll records |> ignore
                     let expected = records
                     let actual = (Expect.wantOk' (testApi.GetRecords ()))
                     let isSuccess = actual = expected 
                     isSuccess
-                ) 
+                ))
         ]
 
 let BuildExampleBasedRegexTests () =

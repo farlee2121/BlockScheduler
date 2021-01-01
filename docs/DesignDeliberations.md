@@ -247,3 +247,13 @@ This [newer plug-in](https://marketplace.visualstudio.com/items?itemName=derivit
     - easy to contribute, add to local settings, or standardize for a company in custom package
 
   The only issue not easily fixable is that it is hard to see the proper test path and I have no control over how tests display in the tree (i.e having separate every level into a tree branch)
+
+
+## State-based managers?
+Inspired by: https://fsharpforfunandprofit.com/posts/calculator-complete-v2/
+
+How could standard crud be state-based?
+- the state transitions are more for individual items...
+- I think the entity itself would have more notion of state, rather than the repository
+  - I could track state for each rule, and only save/update rules. 
+  - This way I would only have list and update operations at the edge. Everything else is an operation on the state of an individual entity...
