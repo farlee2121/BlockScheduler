@@ -257,3 +257,60 @@ How could standard crud be state-based?
 - I think the entity itself would have more notion of state, rather than the repository
   - I could track state for each rule, and only save/update rules. 
   - This way I would only have list and update operations at the edge. Everything else is an operation on the state of an individual entity...
+
+
+## Bolero vs Blazor
+Why is this such a hard decision?
+- F# already has type providers OpenApi. I wouldn't have to write excess client mapping (which is always annoying)
+  - I think I'd still have to write the API... not sure
+- C# has generators now, but there doens't seem to be mature options for build-integrated client generation
+- I want F# as my backend, and don't want to deal with paradigm conflicts from a paradigm handoff
+  - On the other hand, bolero is a side project. It'll lag behind the capabilities of Blazor. there will likely be framework compatability issues
+  - Well... It shows that we can use blazor components within the elmish model... https://fsbolero.io/docs/Blazor
+- I really want cross-platform abilities, which don't seem like they'll be available for bolero, but maybe that's false
+- I don't really have familiarity with Blazor to contrast the two options
+
+Way forward
+- [ ] create UI-only experiment in Blazor (the more sure and stable option)
+- [ ] create same experiment in Bolero
+- [ ] Try to add mobile bindings to both
+
+First, let's tackle capability-based experiment with a console client
+
+
+# Capability Refactor
+I think the background service shouldn't really be capability-based...
+Well, I suppose that it still could be. It wouldn't make much difference though, since there will just be one call that does everything internally. It is the start of authority and there is no follow up.
+
+The start of authority for rule management is the list. 
+
+REALIZATION: Capabilities are intrinsically context-based. They reflect what we expect the end user to be able to do in the given use case. The same underlying functions might be chained differently in different contexts. This is **orchestration**, exactly what managers are supposed to do
+- in the workflow manager style, use case managers could be configurations of one manager that can turn response actions on and off
+
+QUESTION: Do I make any methods public other than the entry point and "ProcessCapability"?
+- Pro: keeps the followup capabilities flexible, only the manager needs to know about the split
+- Con: more opaque what the manager can handle. Have to look at the capability type as well as the interface
+- What is the line between manager-capability handlers and global?
+  - if global, i'd save some duplicate code, but i'd create a lot of coupling. It'd also make the urls easier in an api-based scenario
+  - Managers are supposed to be services. A client could be ok with one endpoint, but the managers can't do that because they may not know about each other and they would have to in order to share a capability endpoint
+
+QUESTION: How do I handle actions that require some unpredictable (non-discrete) user input? Like entering a name?
+- the different actions need to take arguments
+- How does the client know what arguments an action can take?
+
+Lists some examples of HATEOAS: https://medium.com/openlight/the-trouble-with-hateoas-3ed0da733072
+- Github, paypal, aws appstream
+- https://docs.github.com/en/free-pro-team@latest/rest/reference/pulls
+  - github does it in a way that still has predictable urls
+  - All of the page actions are passed in the response. This means the server decides if an action is available or what the link to it looks like. None of tat is encoded in the UI. However, it takes discipline to not use knowledge of the predictable urls
+
+Question: What are the criteria for the client side to change it's api knowledge?
+- Well, I feel like the UI has to know about the different kinds of links it could recieve and how it translates those into the UI
+- It doesn't change if the url for an action changes, but it does if any actions are *added* or get a new identifier
+- The old client can have actions taken away without an update. It can also work as before, without new features, as long as no actions change identifier
+- Again, what about the arguments. How does it know the valid args?
+  - opt 1: shared knowledge/model with server (introduces potential breakage and more need for version sync)
+  - opt 2: args and constraints encoded in the payload
+    - con: a bigger payload
+    - pro: the UI can keep up as long as available input constraints don't change
+    - con: need a somewhat sophisticated input control generator (to choose right inputs and validations)
