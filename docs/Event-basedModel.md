@@ -114,24 +114,18 @@ type RuleListItemModel = {
 type CreateBlockRuleCommand = Command<UnvalidatedBlockRule>
 type RuleCreated = | RuleCreated of RuleId
 type ErrorReason = string
-type CreateRuleError = 
-    | InvalidName of ErrorReason
-    | InvalidTarget of (UnvalidatedBlockTarget, ErrorReason)
-    | InvalidTrigger of (UnvalidatedBlockTrigger, ErrorReason)
-    | Unknown of ErrorReason
 
 type UpdateRuleCommand = Command<(RuleId, UnvalidatedBlockWindow list)>
 type RuleUpdated = | RuleUpdated of RuleId
-type UpdateRuleError = 
+type ValidateRuleError = 
     | InvalidName of ErrorReason
     | InvalidTarget of (UnvalidatedBlockTarget, ErrorReason) 
     | InvalidTrigger of (UnvalidatedBlockTrigger, ErrorReason) 
-    | UnknownRule 
-    | Unknown of string
+    | UnknownRule of ErrorReason
 
 type DeleteBlockRuleCommand = Command<RuleId>
 type RuleDeleted = | RuleDeleted of RuleId
-type RuleDeletedError = | InvalidRule | Unknown of string
+type RuleDeletedError = | InvalidRule | Unknown of ErrorReason
 
 type BlockRuleActivated = BlockRuleActivated of RuleId
 type BlockRuleDeactivated = BlockRuleDeactivated of RuleId
@@ -160,24 +154,24 @@ type RuleManagement = {
 
 // internal
 
-type BlockRule = 
-    | Unvalidated of UnvalidatedBlockRule
-    | Validated of ValidatedBlockRule
+type StatefulBlockRule = 
+    | Active of RuleId
+    | Inactive of RuleId
+    | PendingUpdate of ValidatedBlockRule
+    | PendingDelete of RuleId // need to be careful 
     | Deleted of RuleId
 
-type RuleTransforms = 
-    | Create of CreateBlockRuleCommand
-    | Update of UpdateRuleCommand
-    | Delete of DeleteBlockRuleCommand
-    // activate?
 
 
 type ValidateRuleName = string -> RuleName
 type ValidateBlockTarget = UnvalidatedBlockTarget -> ValidatedBlockTarget
 type ValidateBlockTrigger = UnvalidatedBlockTrigger -> ValidatedBlockTrigger
 type ValidateBlockRule = ValidateRuleName -> ValidateBlockTarget -> ValidateBlockTrigger -> ValidatedBlockRule
-type SaveBlockRule = BlockRule -> unit
-type GetBlockRule = RuleId -> BlockRule
+
+type initializeState = ValidatedBlockRule -> StatefulBlockRule
+
+type SaveBlockRule = StatefulBlockRule -> unit
+type GetBlockRule = RuleId -> StatefulBlockRule
 
 
 // activity management
@@ -193,24 +187,75 @@ type GetActiveRules = unit -> RuleId list
 // since there is no class representing the manager. Thin layers like the read models can just be directly implemented as adapters. The abstraction is just the function signature and alias
 
 ```
-TODO: refactor for named rules with multiple targets, finish defining rule state models
-- the states are a bit muddled, validated, activated, inactive, and unvalidated are not really alternative states
-- Unvalidated, Validated, activated, deleted
-  - this could be good, when activating i don't ever activate an unvalidated or deleted rule. Already active rules need not be activated again...
+TODO: 
+- [x] refactor for named rules with multiple targets, finish defining rule state models
+  - the states are a bit muddled, validated, activated, inactive, and unvalidated are not really alternative states
+  - Unvalidated, Validated, activated, deleted
+    - this could be good, when activating i don't ever activate an unvalidated or deleted rule. Already active rules need not be activated again...
 
 I think that I can leave the list read model as-is. I don't expect them to have different actions based on state from the list view, that will come with the details view
 
-I think I might want to move all the rule crud to a statemachine
-- this would couple a few workflows, but centralize rules on state
-- It would require me to have full state objects as input
-- would simplify the IO commands to just `GetRule = ruleId -> Rule` and `SaveRule -> Rule -> unit`
-  - pro: I put off consideration of state representation
-  - con?: I'm not sure how this relates to optimization. Batch operations should be attainable in the adapter, but what about cases where we need 
-- Q: how does the stateMachine know all the different actions?
-  - I'd have to create extra states like `UndeletedRule` and `UpdatedRule of UnvalidatedBlockRule`
-  - I could also match on an action. That would allow me to push evaluation of both expected state and current state into the state machine
-- this highlights a potential issue. My current design relies on the background task to apply rules, but if a rule is created that should be currently active, then I want to activate it right away
+- [x] I think I might want to move all the rule crud to a statemachine
+  - this would couple a few workflows, but centralize rules on state
+  - It would require me to have full state objects as input
+  - would simplify the IO dependencies to just `GetRule = ruleId -> Rule` and `SaveRule -> Rule -> unit`
+    - pro: I put off consideration of state representation
+    - con?: I'm not sure how this relates to optimization. Batch operations should be attainable in the adapter, but what about cases where we need to represent state in UI
+      - concluded read model state is a bit different
+  - Q: how does the stateMachine know all the different actions?
+    - I'd have to create extra states like `UndeletedRule` and `UpdatedRule of UnvalidatedBlockRule`
+    - I could also match on an action. That would allow me to push evaluation of both expected state and current state into the state machine
+  - [ ] this highlights a potential issue. My current design relies on the background task to apply rules, but if a rule is created that should be currently active, then I want to activate it right away
+  - I'm realizing that passing the action and current state is the same as having a statemachine per command
 
+- [ ] balance activity state with other states
+  - active rules need to move to "Pending Delete" and the activity watcher should enforce pending deletes until their schedule runs out or end of day, then delete them
+  - potential here to require friend approval before removing
+  - What info do an inactive and active rule need?
+    - depends
+      - OPT: have a CreatedRule state that looks something like `(ValidatedRuleData, state)`
+        - pro: means I don't need all info available in later active/inactive models
+        - Q: what about updated rules, they need the same enforcement
+    - OPT: Directly return an Active/Inactive rule on create or update. means those states need to include all the data that `UnvalidatedBlockRule` does
+    - OPT: split unvalidated out of states? no go, i'd still need a way of handling updated events
+  - I also need a `PendingUpdate`, where an active rule does not apply update to activity state until the current trigger is over
+
+- [ ] make sure storage is in response to events returned from workflow
+- [ ] consider making real DTOs (With `toDomain` and `toDto` method)
+
+state machine
+- create
+  - can only be unvalidated, so validate -> Active/Inactive
+- Update
+  - validation fails -> return error
+  - validation succeeds -> 
+    - active | PendingUpdate -> PendingUpdates
+    - PendingDelete -> PendingDelete
+    - inactive -> Active/Inactive
+    - Deleted -> Deleted (error?)
+- Delete
+  - active | PendingUpdate  | PendingDelete -> PendingDelete
+  - inactive -> delete
+  - unvalidated, Deleted -> do nothing or error
+- Activate (the only state that should be available is Inactive)
+  - deleted -> error
+  - _ -> Active 
+- Deactivate
+  - PendingUpdate -> Inactive (updated?)
+  - PendingDelete -> Deleted
+  - Unvalidated -> error
+  - Deleted -> Deleted
+
+Valid/invalid seems to be separate from the other states, I should probably treat it separately and only group the known valid states together for the machine
+- this complicates what the validator should return, should it require someone else to pass it a constructor? should it just retun inactive and pipe through a separate function to determine activity?
+
+## Modeling Errors
+Per Chapter 10 of Domain Modeling Made functional
+- i should model domain error like validation of input data
+- I can choose to model or not model infrastructure errors
+  - the app is small and the consequences of exceptions limited. The only strategy i'd really use if for users or the lowest level infrastructure to retry the action
+  - I expect everything to be on one machine. I don't expect network interruptions or fickle operating conditions
+  - thus I think I should just let exceptions be thrown and catch them at top level
 
 
 ## adding capabilities
@@ -236,6 +281,110 @@ Are capabilities part of the domain?
 - They can change with the user experience we want to provide. We may provide several different user experiences over the same functionality.
   - I suppose that the domain can define all allowable actions and the UI can decide to ignore some of them
   - There is no case where we want the UI to allow actions disallowed by our capability model
+
+
+## Why am I stuck...
+I feel like it's wrong to include all the triggers and block targets in active/inactive block rules.
+Why? It feels like an excess of data...
+Do I need that info to apply a block rule... yes, I do. However, i was planning on just passing ids because that feels less coupled.
+
+The format for CRUD and the format for rule state are conflicting. However, there does need to be a relationship because there is a domain relationship between the actions...
+
+Here's a thought. I need all that info to apply the block rule at some point. I can write a version taking all the info needed to apply the rule. 
+If I have a context that uses less than that amount of info I can just wrap the method in an adapter that gets the full record and passes it in. That would actually be more composable because it pushes the data collection dependency out of the rule application.
+
+Hmm. I'm realizing that I don't need the triggers and the targets together. I only need them one at a time...
+
+```fs
+let isTriggerListActive rules = 
+  // check each type of rule
+
+let applyBlockTargets targets =
+  // match on each kind of target
+```
+
+In a world with unlimited resources, I would keep my activity logic in-app like this. I suppose a user isn't likely to have more than a few dozen block rules. It does feel wrong loading all the rules and cutting myself off from larger scale performance though...
+- This is where datomic transducer-based queries would be nice. I could treat the DB just like it was an in-memory collection
+- could I do that in f#... I don't think that sql type providers work with pattern matching...
+  - here's a proof of concept post https://jefclaes.be/2015/10/bulk-sql-projections-with-f-and-type.html
+  - It doesn't appear to be part of the query expression though https://docs.microsoft.com/en-us/dotnet/fsharp/language-reference/query-expressions
+  - I'm not finding any good projection libraries. Makes sense. Datomic has the benefit of running clojure on both ends. F# would need to translate the expression to some other language like SQL and not everything can be mapped.
+    - the other approach would be loading each record to the program. Could be individual, buffered,... any case would not be good performance wise. They all lose to a proper query
+
+- So what do I do?
+  - push activity determination to someone else?
+  - expect a full list of rules and run through them in the core workflow...
+
+If I pushed off activity the core flow would look something like
+```fs
+type RuleContext = {Time: DateTime} // could include modes, location, etc
+let UpdateRuleActivity ruleContext getActiveRules getRulesTriggeredByContext activateRule deactivateRule = 
+  let currentActiveRules = getActiveRules
+  let triggeredRules = getRulesTriggeredByContext
+  let deactivatingRules = Set.diff currentActiveRules - triggeredRules
+  let deactivatedRules = deactivatingRules |> List.map deactivateRule
+  //(fun rule -> match rule with | PendingUpdate -> | PendingDelete -> | Active -> Inactive | Inactive -> Inactive)
+  let activatedRules triggeredRules |> List.map activateRule 
+  List.concat activatedRules deactivatedRules
+  |> List.map statusToEvents
+
+```
+
+This is kindof a mess. It can't decide if it works only ids or not. I could just have a `setActive ids`. That would push the diff behavior out and make the flow more focused. However, I want the activation/deactivation rules to be an assured part of the workflow. That requires me to know about the greater state of the rule...
+I suppose that activate and deactive could return the events...
+
+Key question: where is it appropriate to inject "getter" functions versus just take a proper list.
+- hypothesis: I think the top-level workflow should probably take care of most of the getters. In most cases it can probably materialize a tight enough list to pass to child functions. 
+
+Note: the id-only version still has me making plenty of queries. it forces me to get individual state in the looped `activate` and `deactivate` functions. This could be avoided if we didn't care about the relationship between rule updates and application, but is unavoidable as-is.
+
+Let's assume I'll just load the whole rule list. What does the workflow look like
+
+```fs
+type RuleContext = {Time: DateTime} // could include modes, location, etc
+type ActivityTransitionEvents = | Activiated rule of StatefulBlockRule | Deactivated rule of StatefulBlockRule
+let UpdateRuleActivity getRules getTransitionState deactivateRule activateRule ruleContext  = 
+  // let getTransitionstate = (fun rule -> match isRuleTriggered ruleContext rule.Triggers with | true -> Activated )
+  getRules ()
+  |> List.map getTransitionState
+  |> List.map (fun transition -> | Activated -> activateRule | Deactivated > deactivateRule)
+  // what do I want to return? events: activated, deactivated, unchanged? I need the new rule states to save off
+  // where do I handle pending actions?
+  // opt: save every rule in it's entirety. I do seem to need all the data for active/inactive/pending update in this view.
+  // opt: leave it to the event handling. no, this pushes it out of the domain
+  // opt: pass in a save function. reasonable, but a bit messy
+
+  // realized that I don't need to save the whole block rule. I pass in stateful rules, but I pass out events. The events can contain less data than the state  
+```
+
+What about persistence?
+- On one hand, I see managers as the head of the system, so I expect them to manage save behavior
+- On the other hand, he doensn't demonstrate saving in the workflow.
+  - He does demonstrates side-effects like sending the acknowledgement as events, which are returned...
+  - DTOs at the least need to be determined outside of the workflow, but that works with either injected save methods or returning data to save
+
+Further review of the book (pages 240-242) makes it clear that injecting functions for persistence actions is not meant to be part of the core workflow, only part of the composition root. 
+- The goal is to separate decisions from storage of the decisions or reaction to the decisions.
+
+This means I probably need more data in my events
+
+Q: Are events ever created below the top level workflow?
+- A: the book examples only create the events in the top level worflow, and only as the last step
+
+
+TODO i'm not sure what to inject in the `UpdateRuleActivity` flow
+  - volitile logic -> what consitutes a transition `getTransitionState` and what happens to a rule on activate / deactivate
+  - I had that at first, but I collapsed it because passing the transition state was kinda confusing and created duplicate pattern matching. To create events i need to know what transition happened and the original state. Even if it's kinda duplicate I guess I should probably encode that info
+  - Hmm. the problem is that there isn't any action taken other than the events. There is no persistence. Instead persistence happens relative to the events. Creating another round of pattern matching outside this workflow... 
+
+notice: My desire it to act on the `StatefulBlockRule` directly and save it off. The issue is that this makes the assumption of a repository-style store. Yes, it could be adapted to event stream, but it reveals that there is some collection sitting out there that I expect to be able to mutate. 
+- returning events doesn't make that assumption. It can easily be thrown away as a dry run.
+- The issue with returning events is that I end up with nearly mirror representations of state inside and outside the workflow
+
+I notice that i don't generally need the rule data inside my workflows. I mostly just need the states, except in the `UpdateRuleActivity` flow.
+- I thought I would need the states to update the rules in the workflow, but the rules aren't updated in the workflow and the events don't need most of the available data for a downstream consumer to update the store
+- this is good in that less knowledge is shared. it is tricky in that I feel like i'm leaving rules implied. I't does allow me to handle things like pending state differently though.
+- 
 
 ## Thoughts from the process
 
@@ -276,6 +425,13 @@ I'm really getting tripped up on state in read models
 - It doesn't feel like there is good model reuse between reads and transforms... And that may be the right call
 
 
+It seems like really following the event, transform, and state decomposition pretty much just turns my managers into state machines, which is great.
+- there can still be flow (like validating first), but it pushes a lot of conditional action out into the adapter.
+- state machines are a more direct translation from the domain
+- it also simplifies the simplest storage case. Since the cases of the entity are all under one type, we can just serialize the whole type and not worry different actions on the storage
+
+I also got really tripped up on where to handle persistance. My past experience really wants to inject storage actions into the workflow
+
 ## Key takeaways
 - need to think more on where capabilities like, in or out of domain
 - this model enables great incremental development
@@ -283,4 +439,6 @@ I'm really getting tripped up on state in read models
   - more knowledge of system represented in the model, surfacing issues faster
 - CRUD takes the form of a state machine with `Action w/ data -> current state -> new state`
   - data is retrieved and persisted independent of state and saved the same, the actual persistent action is determined out of scope based on the state model
+  - a state machine per command is the same as a state machine that take a command and a current state.
+    - If I need to broker different kinds of actions, then I can aggregate on either side of the commands, depending on what is appropriate for the design
   - read models don't live in this state machine, so they need to pass enough data to fetch the existing state object

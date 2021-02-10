@@ -8,6 +8,8 @@
     <Compile Include="HostFileAccessor.fs" />
     <Compile Include="BlockRuleManager.fs" />
     <Compile Include="JsonRuleManagerAdapter.fs" />
+    <Compile Include="BlockRules.publictypes.fs" />
+    <Compile Include="BlockRules.Implementation.fs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="FSharp.Data" Version="3.3.3" />
