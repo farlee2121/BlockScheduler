@@ -13,14 +13,16 @@ type UnvalidatedBlockTarget = Site of string
 type ValidatedBlockTarget = Site of string
 
 type UnvalidatedTimeTrigger = {Start: int * int; End: int * int}
-type UnvalidatedBlockTrigger = | Time of UnvalidatedTimeTrigger
+type UnvalidatedBlockTrigger = | TimeTrigger of UnvalidatedTimeTrigger
 
-type Time = { Hour: int; Minute: int }
+type Time = { Hour: int; Minute: int } 
 module Time = 
     let create hour minute = 
         if (hour < 0 || 23 < hour) then Error "Hour must be between 0 and 23"
         elif (minute < 0 || 60 < minute) then  Error "meow"
         else Ok { Hour = hour; Minute = minute}
+    let (<==) left right =
+        left.Hour <= right.Hour && left.Minute <= right.Minute
 
 type TimeTrigger =  { Start: Time; End: Time }
     
@@ -34,11 +36,11 @@ type TimeTrigger =  { Start: Time; End: Time }
 //         // Result.map (fun start End -> {Start = start; End = End})
 //         // startResult |> Result.bind endResult 
 
-type ValidatedBlockTrigger = Time of TimeTrigger
+type ValidatedBlockTrigger = TimeTrigger of TimeTrigger
 module ValidatedBlockTrigger = 
     let isTimeTrigger trigger = 
         match trigger with 
-            | Time t -> true
+            | TimeTrigger t -> true
 
 type RuleName = RuleName of string
 module RuleName = 

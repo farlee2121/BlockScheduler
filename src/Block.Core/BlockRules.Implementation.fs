@@ -1,7 +1,7 @@
 module BlockRules.Core.Implementation
 open BlockRules.RuleManagement
 open System;
-
+open BlockRules.RuleManagement.Time
 
 module List =
     let return' item = [item] 
@@ -36,12 +36,16 @@ type ActivityTransitions = | Activated | Deactivated | Unchanged
 type IsTimeTriggerActivated = DateTime -> TimeTrigger -> bool
 type GetTransitionState =  (StatefulBlockRule -> bool) -> StatefulBlockRule -> ActivityTransitions
 
-let isTimeTriggerActive (time:DateTime) timeTrigger = 
-    time.Hour = timeTrigger.Hour && time.Minute = 
+let isTimeTriggerActive (time:DateTime) trigger = 
+    let time' = (Time.create time.Hour time.Minute)
+    match time' with
+    | Ok t -> (trigger.Start <== t) && (t <== trigger.End)
+    | Error _ -> false
+    
 
 let isTriggerActive triggerContext trigger = 
     match trigger with
-    | Time t -> isTimeTriggerActive triggerContext.Time t
+    | TimeTrigger t -> isTimeTriggerActive triggerContext.Time t
 
 let isAnyTriggerActive context triggers =
     triggers 
