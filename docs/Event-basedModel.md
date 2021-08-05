@@ -18,6 +18,7 @@ The chain of events seems very short...
 - block hours updated
   - source: user
   - Command: UpdateBlockSchedule
+  - REQ: if block running, finish the current block period before applying updates
 - ScheduledBlockStarted
   - Source: time / saved schedule
   - Time: `BlockStarted` triggered by registered schedule
@@ -32,7 +33,7 @@ The chain of events seems very short...
   - command: `PauseBlock`
 - BlockDeleted
   - source: user
-  - if block running, don't remove until normal period finished or end of day
+  - REQ: if block running, don't remove until normal period finished or end of day
 
 sub-domains
 - it's so small i think there is only one domain context
@@ -442,3 +443,14 @@ I also got really tripped up on where to handle persistance. My past experience 
   - a state machine per command is the same as a state machine that take a command and a current state.
     - If I need to broker different kinds of actions, then I can aggregate on either side of the commands, depending on what is appropriate for the design
   - read models don't live in this state machine, so they need to pass enough data to fetch the existing state object
+
+!!! I realized that commands can nest. I could include a list of  add-note/delete-note commands as part of the update-partner command. Then I could choose to call them together or separate without needing to write any new command handlers or event handlers
+- there is also no ambiguity in resolving against current state because each level is in terms of an action (or difference)
+
+I'm realizing command convention (event-based) makes for very flexible invocation. Endpoints don't really matter. The identity is contained in the command. Thus
+- events can be nested / batched 
+- events can be streamed/queued
+  - we could serialize any subset of commands pretty easily
+- events can be invoked individually
+- events can be held for later execution
+In a way, it makes our api a batch language

@@ -11,12 +11,12 @@ open ExpectoExtensions
 type HostAccessorApi<'a, 'err> = { GetRecords: (unit -> Result<HostRecord list, 'err>); WriteAll: (HostRecord list -> 'a)}
 
 
-let BuildHostAccessorTests setup cleanup () =
+let BuildHostAccessorTests testEnv () =
     let config = HostRecordGen.registerAll FsCheckConfig.defaultConfig
 
-    let test' = testWithEnv setup cleanup
-    let testProperty' name = testPropertyWithConfig config name
-    let withEnv' = withEnv setup cleanup
+    let test' = testWithEnv testEnv
+    let testProperty' name = testEnvPropertyWithConfig testEnv config name
+    let withEnv' = withEnvI testEnv
     
         
     testList "HostAccessorTests" [
@@ -24,24 +24,24 @@ let BuildHostAccessorTests setup cleanup () =
             let records = testApi.GetRecords ()
             Expect.isEmpty (Expect.wantOk' records) ""
 
-        testProperty'  "Single record: read equals write" 
-            <| (fun (record:HostRecord) -> withEnv' (fun testApi ->
+        testProperty' "Single record: read equals write" 
+            <| fun testApi (record:HostRecord) ->
                     testApi.WriteAll [record] |> ignore
                     let actual = (Expect.wantOk' (testApi.GetRecords ()))
                     let isSuccess = actual = [record]
                     // NOTE: potential alternative is to compose an Arb for the composite type and use Prop.forAll 
                     isSuccess
                     
-            ))
+            
 
-        testPropertyWithConfig { config with endSize = 5 } "Multi-record: read equals write" 
-                (fun (records:HostRecord list) -> withEnv' (fun testApi ->                   
+        testEnvPropertyWithConfig testEnv { config with endSize = 5 } "Multi-record: read equals write" 
+                (fun testApi (records:HostRecord list) ->                
                     testApi.WriteAll records |> ignore
                     let expected = records
                     let actual = (Expect.wantOk' (testApi.GetRecords ()))
                     let isSuccess = actual = expected 
                     isSuccess
-                ))
+                )
         ]
 
 let BuildExampleBasedRegexTests () =
@@ -95,20 +95,39 @@ let ``HostAccessor In-Memory Array`` =
         let writer lines = records <- lines
         {GetRecords = (getRecords reader); WriteAll = (writeAll writer)}
 
-    let setup () = 
-        let guid = System.Guid.NewGuid()
-        printfn "setup %O" guid
-        (testApiProvider (), guid)
-    let cleanup env = 
-        printfn "cleanup %O" env 
+
+    let testEnv = {
+        new ITestEnv<HostAccessorApi<unit, 'a>, System.Guid> with 
+            member this.Setup () =
+                let guid = System.Guid.NewGuid()
+                printfn "setup %O" guid
+                ((testApiProvider ()), guid)
+
+            member this.Cleanup env =
+                printfn "cleanup %O" env 
+    }
+     
     testList "Host Accessor Spec" [
-        BuildHostAccessorTests setup cleanup ()
+        BuildHostAccessorTests testEnv ()
         BuildExampleBasedRegexTests ()
     ]
 
 
 [<Tests>]
 let ``HostAccessor with SectionWriter`` = 
+
+    let testEnv = {
+        new ITestEnv<HostAccessorApi<Stream, 'a>, System.IO.MemoryStream> with 
+            member this.Setup () =
+                let sectionId = SectionWriter.SectionId "Block Test"
+                let stream = (new MemoryStream());
+                let reader () = SectionWriter.readSection stream sectionId () |> Ok
+                let writer lines = SectionWriter.writeSection stream sectionId lines
+                ({GetRecords = (getRecords reader); WriteAll = (writeAll writer)}, stream)
+
+            member this.Cleanup (env: #Stream) =
+                env.Dispose() 
+    }
 
     let setup () =
         let sectionId = SectionWriter.SectionId "Block Test"
@@ -121,7 +140,7 @@ let ``HostAccessor with SectionWriter`` =
         stream.Dispose()
 
     testList "HostAccessor with SectionWriter" [
-        BuildHostAccessorTests setup cleanup ()
+        BuildHostAccessorTests testEnv ()
     ]
 
 
