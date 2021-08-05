@@ -7,6 +7,7 @@ open FsCheck
 open TypeGenerators
 open System.IO
 open ExpectoExtensions
+open Expecto.TestApi
 
 type HostAccessorApi<'a, 'err> = { GetRecords: (unit -> Result<HostRecord list, 'err>); WriteAll: (HostRecord list -> 'a)}
 

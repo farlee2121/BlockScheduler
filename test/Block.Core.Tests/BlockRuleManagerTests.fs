@@ -3,6 +3,7 @@ open Expecto
 open FsCheck
 open ExpectoExtensions
 open BlockRuleManager
+open Expecto.TestApi
 
 
 type RuleCrudTestApi = {

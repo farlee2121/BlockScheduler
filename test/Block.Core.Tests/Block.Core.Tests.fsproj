@@ -3,6 +3,7 @@
     <TargetFramework>net5</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Expecto.TestApi.fs" />
     <Compile Include="ExpectoExtensions.fs" />
     <Compile Include="BlockRuleManagerTests.fs" />
     <None Include="Constraint\Design.md" />
