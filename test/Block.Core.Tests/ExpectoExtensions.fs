@@ -29,28 +29,20 @@ type TestEnv<'api, 'env> =
 
 
 
-let withEnv setup cleanup f () =
-    let (api, env) = setup ()
-    let result = f api
-    cleanup env
-    result
-
-
-
-let withEnvI (testEnv:ITestEnv<'api, 'env>) f = 
+let withEnv (testEnv:ITestEnv<'api, 'env>) f = 
     let (api, env) = testEnv.Setup ()
     let result = f api
     testEnv.Cleanup env
     result
 
 let withEnvAndArgs (testEnv:ITestEnv<'api, 'env>) f argTuple= 
-    withEnvI testEnv (fun api -> f api argTuple)
+    withEnv testEnv (fun api -> f api argTuple)
 
-let testWithEnv testEnv name test = 
-    testCase name (fun () -> withEnvI testEnv test)
+let testWithEnv name test testEnv = 
+    testCase name (fun () -> withEnv testEnv test)
     
     
-let testEnvProperty testEnv name (ftest: 'api -> 'argtuple -> 'a) =
+let testPropertyWithEnv name (ftest: 'api -> 'argtuple -> 'a) testEnv =
     //Mostly intuitive property test with centralized environment application
     // Takes advantage of the fact that
     // 1. destructured tuples look almost identical to additional function parameters,
@@ -58,30 +50,15 @@ let testEnvProperty testEnv name (ftest: 'api -> 'argtuple -> 'a) =
     // 2. FsCheck knows how to automatically build tuples from sub-types
     testProperty name (withEnvAndArgs testEnv ftest)
 
-let testEnvPropertyWithConfig testEnv config name ftest =
+let testPropertyWithConfigWithEnv config name ftest testEnv =
     testPropertyWithConfig config name (withEnvAndArgs testEnv ftest)
 
+//IDEA: some of these names are pretty long. I should consider aliasing them
 
+type EnvironmentTestFactory<'api, 'env> = ITestEnv<'api, 'env> -> Test
 
-// let testPropertyWithEnvAndConfig setup cleanup config name prop =
-//     // IMPORTANT: the closest i've gotten, but only running setup once and not running the cleanup (because it doesn't find a match in the dictionary)
-//     let envdict = (new System.Collections.Generic.Dictionary<obj,'b>())
-//     let prop' = lazy(
-//         let (api, env) = setup ()
-//         envdict.Add(api :> obj, env)
-//         prop api
-//         )
-//     let receiveArgsWithClean defaultReceiveArgs' = (fun config name testNum (args:obj list) -> 
-//                             printfn "running cleanup"
+let testListWithEnv listName (testList : EnvironmentTestFactory<'api, 'env> list) (env : ITestEnv<'api, 'env>) : Test = 
+    let applyEnv f = f env
+    Expecto.Tests.testList listName (List.map applyEnv testList) 
 
-//                             args |> List.map (function 
-//                             | arg when envdict.ContainsKey(arg) -> 
-//                                 printfn "running cleanup %O" envdict.[arg]
-//                                 cleanup envdict.[arg]
-//                             | _ -> () ) |> ignore
-//                             defaultReceiveArgs' config name testNum args
-//                         ) 
-//     let configWithCleanup = { config with receivedArgs = receiveArgsWithClean config.receivedArgs }
-
-//     testPropertyWithConfig configWithCleanup name prop'
 

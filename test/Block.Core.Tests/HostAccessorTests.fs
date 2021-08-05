@@ -13,18 +13,13 @@ type HostAccessorApi<'a, 'err> = { GetRecords: (unit -> Result<HostRecord list, 
 
 let BuildHostAccessorTests testEnv () =
     let config = HostRecordGen.registerAll FsCheckConfig.defaultConfig
-
-    let test' = testWithEnv testEnv
-    let testProperty' name = testEnvPropertyWithConfig testEnv config name
-    let withEnv' = withEnvI testEnv
     
-        
-    testList "HostAccessorTests" [
-        test' "List Records Empty When None Written" <| fun testApi ->
+    testListWithEnv "HostAccessorTests" [
+        testWithEnv "List Records Empty When None Written" <| fun testApi ->
             let records = testApi.GetRecords ()
             Expect.isEmpty (Expect.wantOk' records) ""
 
-        testProperty' "Single record: read equals write" 
+        testPropertyWithConfigWithEnv config "Single record: read equals write" 
             <| fun testApi (record:HostRecord) ->
                     testApi.WriteAll [record] |> ignore
                     let actual = (Expect.wantOk' (testApi.GetRecords ()))
@@ -34,7 +29,7 @@ let BuildHostAccessorTests testEnv () =
                     
             
 
-        testEnvPropertyWithConfig testEnv { config with endSize = 5 } "Multi-record: read equals write" 
+        testPropertyWithConfigWithEnv { config with endSize = 5 } "Multi-record: read equals write" 
                 (fun testApi (records:HostRecord list) ->                
                     testApi.WriteAll records |> ignore
                     let expected = records
@@ -42,7 +37,7 @@ let BuildHostAccessorTests testEnv () =
                     let isSuccess = actual = expected 
                     isSuccess
                 )
-        ]
+        ] testEnv
 
 let BuildExampleBasedRegexTests () =
     // a fallback to make sure the property test hits important cases

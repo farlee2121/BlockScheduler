@@ -12,16 +12,11 @@ type RuleCrudTestApi = {
     DeleteRule: DeleteRule
 }
 let buildRuleCrudTests testEnv =
-
-    let test' = testWithEnv testEnv
-    let testProperty' = testEnvProperty testEnv
-    // let testProperty' = testProperty with Con setup cleanup FsCheckConfig.defaultConfig
-
-    testList "Block Rule CRUD" [
-        test' "List empty when no rules created" <| fun testApi ->
+    testListWithEnv "Block Rule CRUD" [
+        testWithEnv "List empty when no rules created" <| fun testApi ->
             Expect.isEmpty' (testApi.ListRules ())
 
-        testProperty' "Created shows in list"  (fun (testApi) (rules: (Blockable * Schedule) list) -> 
+        testPropertyWithEnv "Created shows in list"  (fun (testApi) (rules: (Blockable * Schedule) list) -> 
             let mapCreated (blockable, schedule) = ((blockable, schedule), testApi.CreateRule blockable schedule)
             let created = rules |> List.map mapCreated
             let listed = testApi.ListRules ()
@@ -34,7 +29,7 @@ let buildRuleCrudTests testEnv =
         // incomplete rules? that shouldn't even be possible. Should be covered by the constructor
         // update any listed rule
         // delete any listed rule
-    ]
+    ] testEnv
 
 
 [<Tests>]
