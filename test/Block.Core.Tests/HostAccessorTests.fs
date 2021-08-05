@@ -96,16 +96,24 @@ let ``HostAccessor In-Memory Array`` =
         {GetRecords = (getRecords reader); WriteAll = (writeAll writer)}
 
 
-    let testEnv = {
-        new ITestEnv<HostAccessorApi<unit, 'a>, System.Guid> with 
-            member this.Setup () =
-                let guid = System.Guid.NewGuid()
-                printfn "setup %O" guid
-                ((testApiProvider ()), guid)
-
-            member this.Cleanup env =
-                printfn "cleanup %O" env 
+    let testEnv ={
+        setup = (fun () -> 
+            let guid = System.Guid.NewGuid()
+            printfn "setup %O" guid
+            ((testApiProvider ()), guid))
+        cleanup = (fun env -> printfn "cleanup %O" env )
     }
+
+    //let testEnv = {
+    //    new ITestEnv with 
+    //        member this.Setup () : (HostAccessorApi<unit, 'a> * System.Guid) =
+    //            let guid = System.Guid.NewGuid()
+    //            printfn "setup %O" guid
+    //            ((testApiProvider ()), guid)
+
+    //        member this.Cleanup env : System.Guid =
+    //            printfn "cleanup %O" env 
+    //}
      
     testList "Host Accessor Spec" [
         BuildHostAccessorTests testEnv ()
@@ -117,27 +125,15 @@ let ``HostAccessor In-Memory Array`` =
 let ``HostAccessor with SectionWriter`` = 
 
     let testEnv = {
-        new ITestEnv<HostAccessorApi<Stream, 'a>, System.IO.MemoryStream> with 
-            member this.Setup () =
-                let sectionId = SectionWriter.SectionId "Block Test"
-                let stream = (new MemoryStream());
-                let reader () = SectionWriter.readSection stream sectionId () |> Ok
-                let writer lines = SectionWriter.writeSection stream sectionId lines
-                ({GetRecords = (getRecords reader); WriteAll = (writeAll writer)}, stream)
+        setup = fun () ->
+            let sectionId = SectionWriter.SectionId "Block Test"
+            let stream = (new MemoryStream());
+            let reader () = SectionWriter.readSection stream sectionId () |> Ok
+            let writer lines = SectionWriter.writeSection stream sectionId lines
+            ({GetRecords = (getRecords reader); WriteAll = (writeAll writer)}, stream)
 
-            member this.Cleanup (env: #Stream) =
-                env.Dispose() 
+        cleanup = fun env -> env.Dispose() 
     }
-
-    let setup () =
-        let sectionId = SectionWriter.SectionId "Block Test"
-        let stream = (new MemoryStream());
-        let reader () = SectionWriter.readSection stream sectionId () |> Ok
-        let writer lines = SectionWriter.writeSection stream sectionId lines
-        ({GetRecords = (getRecords reader); WriteAll = (writeAll writer)}, stream)
-
-    let cleanup (stream:Stream) = 
-        stream.Dispose()
 
     testList "HostAccessor with SectionWriter" [
         BuildHostAccessorTests testEnv ()

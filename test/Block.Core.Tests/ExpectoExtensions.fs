@@ -14,9 +14,19 @@ module Expect =
 
 
 //TODO: split out the testApi stuff into it's own module
-type ITestEnv<'api, 'env> = 
+type ITestEnv<'api, 'env>  = 
     abstract Setup : unit -> ('api * 'env)
     abstract Cleanup : 'env -> unit
+
+type TestEnv<'api, 'env> = 
+    { 
+        setup : unit -> ('api * 'env)
+        cleanup : 'env -> unit
+    }
+    interface ITestEnv<'api, 'env> with
+        member this.Setup () = this.setup ()
+        member this.Cleanup (env) = this.cleanup env
+
 
 
 let withEnv setup cleanup f () =
@@ -27,14 +37,13 @@ let withEnv setup cleanup f () =
 
 
 
-
-let withEnvI (testEnv:ITestEnv<'a, 'b>) f = 
+let withEnvI (testEnv:ITestEnv<'api, 'env>) f = 
     let (api, env) = testEnv.Setup ()
     let result = f api
     testEnv.Cleanup env
     result
 
-let withEnvAndArgs (testEnv:ITestEnv<'a, 'b>) f argTuple= 
+let withEnvAndArgs (testEnv:ITestEnv<'api, 'env>) f argTuple= 
     withEnvI testEnv (fun api -> f api argTuple)
 
 let testWithEnv testEnv name test = 
