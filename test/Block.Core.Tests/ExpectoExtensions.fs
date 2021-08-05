@@ -53,12 +53,17 @@ let testPropertyWithEnv name (ftest: 'api -> 'argtuple -> 'a) testEnv =
 let testPropertyWithConfigWithEnv config name ftest testEnv =
     testPropertyWithConfig config name (withEnvAndArgs testEnv ftest)
 
-//IDEA: some of these names are pretty long. I should consider aliasing them
-
 type EnvironmentTestFactory<'api, 'env> = ITestEnv<'api, 'env> -> Test
 
 let testListWithEnv listName (testList : EnvironmentTestFactory<'api, 'env> list) (env : ITestEnv<'api, 'env>) : Test = 
     let applyEnv f = f env
     Expecto.Tests.testList listName (List.map applyEnv testList) 
 
+//////
+// Alisases
+//////
 
+let etestList = testListWithEnv
+let etest = testWithEnv
+let etestProperty = testPropertyWithEnv
+let etestPropertyWithConfig = testPropertyWithConfigWithEnv
