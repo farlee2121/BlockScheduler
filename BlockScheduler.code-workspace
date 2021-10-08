@@ -6,5 +6,6 @@
 	],
 	"settings": {
 		"dotnetCoreExplorer.searchpatterns": "**/test/**/*Tests.dll",
+		"testExplorer.useNativeTesting": true
 	}
 }
